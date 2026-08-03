@@ -103,8 +103,10 @@ echo.
 goto :menu
 
 :restart_all
+echo  Restarting all services...
+echo.
 call :do_stop_all
-timeout /t 2 /nobreak >nul
+timeout /t 3 /nobreak >nul
 goto :start_all
 
 :start_backend
@@ -138,6 +140,7 @@ goto :menu
 
 :stop_all
 call :do_stop_all
+echo.
 echo  [OK] All services stopped.
 echo.
 goto :menu
@@ -145,9 +148,27 @@ goto :menu
 :: ==================== Subroutines ====================
 
 :do_stop_all
-echo Stopping all services...
-for /f "tokens=5" %%p in ('netstat -aon 2^>nul ^| findstr ":8000" ^| findstr "LISTENING" 2^>nul') do taskkill /PID %%p /F >nul 2>&1
-for /f "tokens=5" %%p in ('netstat -aon 2^>nul ^| findstr ":5173" ^| findstr "LISTENING" 2^>nul') do taskkill /PID %%p /F >nul 2>&1
+echo  Stopping all services...
+
+:: 1. Kill by window title (close the cmd windows and their child processes)
+echo   - Closing YiYu-Backend window...
+taskkill /FI "WINDOWTITLE eq YiYu-Backend*" /T /F >nul 2>&1
+
+echo   - Closing YiYu-Frontend window...
+taskkill /FI "WINDOWTITLE eq YiYu-Frontend*" /T /F >nul 2>&1
+
+:: 2. Fallback: kill by port (in case windows were renamed)
+echo   - Killing processes on port 8000...
+for /f "tokens=5" %%p in ('netstat -aon 2^>nul ^| findstr ":8000" ^| findstr "LISTENING" 2^>nul') do (
+    taskkill /PID %%p /F >nul 2>&1
+)
+
+echo   - Killing processes on port 5173...
+for /f "tokens=5" %%p in ('netstat -aon 2^>nul ^| findstr ":5173" ^| findstr "LISTENING" 2^>nul') do (
+    taskkill /PID %%p /F >nul 2>&1
+)
+
+echo  [OK] All services stopped.
 exit /b 0
 
 :do_start_backend
