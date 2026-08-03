@@ -83,7 +83,7 @@ export default function ProfilePage() {
       // 后端未启动 — 使用 AuthContext 信息构建 fallback
       if (user) {
         const fallback = buildFallbackProfile(
-          user.id, user.display_name, user.username, user.email, user.tags, user.avatar_url,
+          user.id, user.display_name || '', user.username, user.email, user.tags, user.avatar_url,
         );
         setProfile(fallback);
         setEditForm({

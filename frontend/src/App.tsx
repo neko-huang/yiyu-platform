@@ -18,6 +18,9 @@ const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const PublicProfilePage = lazy(() => import('./pages/PublicProfilePage'));
 const SearchPage = lazy(() => import('./pages/SearchPage'));
 const SOPPage = lazy(() => import('./pages/SOPPage'));
+const AlbumPage = lazy(() => import('./pages/AlbumPage'));
+const DiscussionPage = lazy(() => import('./pages/DiscussionPage'));
+const AchievementPage = lazy(() => import('./pages/AchievementPage'));
 
 /** 全局加载占位符 */
 function PageLoading() {
@@ -57,6 +60,9 @@ function App() {
         <Route path="/map" element={<Suspense fallback={<PageLoading />}><MapPage /></Suspense>} />
         <Route path="/ai-plan" element={<Suspense fallback={<PageLoading />}><AIPlan /></Suspense>} />
         <Route path="/sop" element={<Suspense fallback={<PageLoading />}><SOPPage /></Suspense>} />
+        <Route path="/events/:id/album" element={<Suspense fallback={<PageLoading />}><AlbumPage /></Suspense>} />
+        <Route path="/events/:id/discussion" element={<Suspense fallback={<PageLoading />}><DiscussionPage /></Suspense>} />
+        <Route path="/achievements" element={<Suspense fallback={<PageLoading />}><AchievementPage /></Suspense>} />
         <Route path="/profile" element={<Suspense fallback={<PageLoading />}><ProfilePage /></Suspense>} />
 
         {/* 管理端路由 */}

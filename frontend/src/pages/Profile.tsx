@@ -59,7 +59,7 @@ export default function Profile() {
   useEffect(() => {
     if (user) {
       setEditForm({
-        display_name: user.display_name,
+        display_name: user.display_name || '',
         email: user.email,
         tags: user.tags,
       });
@@ -122,7 +122,7 @@ export default function Profile() {
       <div className="card p-6 mb-6">
         <div className="flex items-center gap-6">
           <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary-400 to-primary-700 flex items-center justify-center text-white text-2xl font-bold">
-            {user.display_name.charAt(0).toUpperCase()}
+            {(user.display_name || '?').charAt(0).toUpperCase()}
           </div>
           <div className="flex-1">
             <div className="flex items-center gap-2">

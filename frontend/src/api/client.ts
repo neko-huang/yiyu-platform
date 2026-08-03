@@ -80,6 +80,14 @@ import type {
   SOPTemplateCreateRequest,
   SOPTemplateListResponse,
   FinanceSummaryData,
+  Copywriting,
+  Album,
+  AlbumPhoto,
+  Discussion,
+  Achievement,
+  UserAchievement,
+  PointTransaction,
+  PointsSummary,
 } from '../types';
 
 /** 获取当前用户画像 */
@@ -225,6 +233,69 @@ export async function useSOPTemplate(templateId: number): Promise<SOPTemplate> {
 /** 获取活动财务汇总 */
 export async function getFinanceSummary(eventId: number): Promise<FinanceSummaryData> {
   const res = await client.get<FinanceSummaryData>(`/events/${eventId}/finance/summary`);
+  return res.data;
+}
+
+
+// ===== Phase 3: Copywriting, Albums, Discussions, Achievements =====
+
+/** 生成活动文案 */
+export async function generateCopywriting(eventId: number, platform: string, stage: string = 'before'): Promise<Copywriting> {
+  const res = await client.post<Copywriting>(`/events/${eventId}/copywriting`, { platform, stage });
+  return res.data;
+}
+
+/** 获取活动文案列表 */
+export async function getCopywritings(eventId: number): Promise<Copywriting[]> {
+  const res = await client.get<Copywriting[]>(`/events/${eventId}/copywriting`);
+  return res.data;
+}
+
+/** 创建活动相册 */
+export async function createAlbum(eventId: number, data: { title?: string; description?: string }): Promise<Album> {
+  const res = await client.post<Album>(`/events/${eventId}/albums`, data);
+  return res.data;
+}
+
+/** 获取活动相册列表 */
+export async function getAlbums(eventId: number): Promise<{ total: number; items: Album[] }> {
+  const res = await client.get<{ total: number; items: Album[] }>(`/events/${eventId}/albums`);
+  return res.data;
+}
+
+/** 上传照片到相册 */
+export async function addAlbumPhoto(albumId: number, data: { image_url: string; caption?: string }): Promise<AlbumPhoto> {
+  const res = await client.post<AlbumPhoto>(`/albums/${albumId}/photos`, data);
+  return res.data;
+}
+
+/** 获取活动讨论 */
+export async function getDiscussions(eventId: number): Promise<{ total: number; items: Discussion[] }> {
+  const res = await client.get<{ total: number; items: Discussion[] }>(`/events/${eventId}/discussions`);
+  return res.data;
+}
+
+/** 发布讨论 */
+export async function createDiscussion(eventId: number, content: string, parentId?: number): Promise<Discussion> {
+  const res = await client.post<Discussion>(`/events/${eventId}/discussions`, { content, parent_id: parentId });
+  return res.data;
+}
+
+/** 获取积分概览 */
+export async function getPointsSummary(): Promise<PointsSummary> {
+  const res = await client.get<PointsSummary>('/users/me/points');
+  return res.data;
+}
+
+/** 获取所有成就 */
+export async function getAchievements(): Promise<Achievement[]> {
+  const res = await client.get<Achievement[]>('/achievements');
+  return res.data;
+}
+
+/** 获取积分排行榜 */
+export async function getLeaderboard(): Promise<Array<{ user_id: number; username: string; display_name: string; total_points: number; rank: number }>> {
+  const res = await client.get('/leaderboard');
   return res.data;
 }
 

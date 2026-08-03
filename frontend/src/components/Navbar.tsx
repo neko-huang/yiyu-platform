@@ -7,6 +7,7 @@ const navItems = [
   { path: '/map', label: '地图', icon: '🗺️' },
   { path: '/ai-plan', label: 'AI策划', icon: '✨' },
   { path: '/sop', label: 'SOP模板', icon: '📋' },
+  { path: '/achievements', label: '成就中心', icon: '🏆' },
 ];
 
 const adminNavItems = [
@@ -184,6 +185,13 @@ export default function Navbar() {
                       role="menuitem"
                     >
                       <span>🔍</span> 搜索活动
+                    </Link>
+                    <Link
+                      to="/achievements"
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                      role="menuitem"
+                    >
+                      <span>🏆</span> 成就中心
                     </Link>
 
                     {/* 分隔线 */}

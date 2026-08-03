@@ -162,3 +162,48 @@ async def generate_sop_from_event(event_data: dict) -> str:
 
     user_content = "请为以下活动生成一份标准 SOP 模板：\n\n" + "\n".join(info_lines)
     return await _call_deepseek(SOP_SYSTEM_PROMPT, user_content, max_tokens=4096)
+
+# ---------------------------------------------------------------------------
+# AI 多平台文案生成
+# ---------------------------------------------------------------------------
+COPYWRITING_PROMPTS = {
+    "wechat": "你是微信公众号编辑。请根据活动信息撰写一篇微信公众号推广文案，包含标题、正文（300字左右）、CTA按钮文案。语气亲切专业。",
+    "xiaohongshu": "你是小红书博主。请根据活动信息撰写一篇小红书风格的种草笔记，包含标题（带emoji）、正文（200字左右）、标签。语气活泼有感染力。",
+    "weibo": "你是微博运营。请根据活动信息撰写一条微博推广文案（140字以内），带话题标签和emoji。",
+    "friends": "你是朋友圈文案高手。请根据活动信息撰写一条朋友圈推广文案（100字以内），自然不做作，引发好奇。",
+}
+
+
+async def generate_copywriting(event_data: dict, platform: str) -> str:
+    """
+    根据活动信息和目标平台生成推广文案。
+
+    Args:
+        event_data: 活动信息字典（title, category, description, location, price 等）
+        platform: 目标平台 (wechat / xiaohongshu / weibo / friends)
+
+    Returns:
+        生成的文案文本
+    """
+    system_prompt = COPYWRITING_PROMPTS.get(platform)
+    if not system_prompt:
+        raise ValueError(f"不支持的平台: {platform}，可选: {list(COPYWRITING_PROMPTS.keys())}")
+
+    info_lines = [
+        f"活动名称：{event_data.get('title', '未命名')}",
+        f"活动类别：{event_data.get('category', '通用')}",
+        f"活动类型：{event_data.get('type', 'offline')}",
+        f"地点：{event_data.get('location', '待定')}",
+        f"票价：{event_data.get('price', 0)}元",
+        f"人数上限：{event_data.get('max_participants', '未知')}",
+    ]
+    if event_data.get("tags"):
+        info_lines.append(f"标签：{', '.join(event_data['tags'])}")
+    if event_data.get("description"):
+        info_lines.append(f"\n活动描述：{event_data['description']}")
+    if event_data.get("stage"):
+        stage_map = {"before": "活动预热推广", "during": "活动中实时传播", "after": "活动回顾总结"}
+        info_lines.append(f"\n文案阶段：{stage_map.get(event_data['stage'], '活动推广')}")
+
+    user_content = "请为以下活动生成推广文案：\n\n" + "\n".join(info_lines)
+    return await _call_deepseek(system_prompt, user_content, max_tokens=2048)

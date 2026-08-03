@@ -20,6 +20,10 @@ from routers.registrations import router as registrations_router
 from routers.reviews import router as reviews_router
 from routers.sop_templates import router as sop_templates_router
 from routers.upload import router as upload_router
+from routers.copywriting import router as copywriting_router
+from routers.albums import router as albums_router
+from routers.discussions import router as discussions_router
+from routers.achievements import router as achievements_router
 
 
 @asynccontextmanager
@@ -88,6 +92,10 @@ app.include_router(profiles_router, prefix=API_PREFIX)
 app.include_router(reviews_router, prefix=API_PREFIX)
 app.include_router(sop_templates_router, prefix=API_PREFIX)
 app.include_router(upload_router, prefix=API_PREFIX)
+app.include_router(copywriting_router, prefix=API_PREFIX)
+app.include_router(albums_router, prefix=API_PREFIX)
+app.include_router(discussions_router, prefix=API_PREFIX)
+app.include_router(achievements_router, prefix=API_PREFIX)
 
 
 @app.get("/")

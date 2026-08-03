@@ -20,7 +20,7 @@ from datetime import date, datetime, timedelta, timezone
 from sqlalchemy import select
 
 from database import async_session, engine, init_db
-from models import AIPlan, Event, FinanceRecord, Registration, User, UserProfile
+from models import AIPlan, Achievement, Event, FinanceRecord, PointTransaction, Registration, User, UserAchievement, UserProfile
 from services.auth import hash_password
 
 # ---------------------------------------------------------------------------
@@ -314,6 +314,25 @@ FINANCE_TEMPLATES = [
 ]
 
 
+# ---------------------------------------------------------------------------
+# 成就种子数据
+# ---------------------------------------------------------------------------
+ACHIEVEMENTS = [
+    {"name": "初来乍到", "description": "完成首次登录，开启益屿之旅", "icon": "🌟",
+     "condition_type": "events_joined", "condition_value": 1},
+    {"name": "活跃达人", "description": "参加5场活动", "icon": "🎯",
+     "condition_type": "events_joined", "condition_value": 5},
+    {"name": "组织者之星", "description": "组织3场活动", "icon": "👑",
+     "condition_type": "events_organized", "condition_value": 3},
+    {"name": "创意大师", "description": "使用AI生成5份方案", "icon": "💡",
+     "condition_type": "ai_plans", "condition_value": 5},
+    {"name": "满分好评", "description": "获得平均4.5分以上评价", "icon": "🏆",
+     "condition_type": "avg_rating", "condition_value": 45},  # 45 = 4.5 * 10
+    {"name": "连续参与", "description": "连续3个月参加活动", "icon": "🔥",
+     "condition_type": "streak", "condition_value": 3, "is_limited": True},
+]
+
+
 async def seed():
     print("🚀 开始初始化数据库...")
 
@@ -526,6 +545,47 @@ async def seed():
         await session.flush()
         print("   ✅ 创建 1 条 AI 方案示例")
 
+        # ---------------------------------------------------------------
+        # 6. 创建成就定义
+        # ---------------------------------------------------------------
+        print("🏅 创建成就定义...")
+        ach_objs = []
+        for ach_data in ACHIEVEMENTS:
+            achievement = Achievement(**ach_data)
+            session.add(achievement)
+            ach_objs.append(achievement)
+
+        await session.flush()
+        print(f"   ✅ 创建 {len(ach_objs)} 个成就定义")
+
+        # ---------------------------------------------------------------
+        # 7. 为部分用户创建示例积分和成就
+        # ---------------------------------------------------------------
+        print("💎 创建示例积分与成就...")
+        pt_count = 0
+        for user in user_objs:
+            # 给每个用户一些初始积分
+            initial_points = random.randint(50, 500)
+            tx = PointTransaction(
+                user_id=user.id,
+                points=initial_points,
+                tx_type="initial_grant",
+                description="新用户注册奖励",
+            )
+            session.add(tx)
+            pt_count += 1
+
+        # 为前几个用户解锁 "初来乍到" 成就
+        for user in user_objs[:5]:
+            ua = UserAchievement(
+                user_id=user.id,
+                achievement_id=ach_objs[0].id,  # 初来乍到
+            )
+            session.add(ua)
+
+        await session.flush()
+        print(f"   ✅ 创建 {pt_count} 条积分记录，5 条成就记录")
+
         await session.commit()
 
     print("\n" + "=" * 50)
@@ -537,6 +597,8 @@ async def seed():
     print(f"  报名: {reg_count} 条")
     print(f"  财务: {fin_count} 条")
     print(f"  AI方案: 1 条")
+    print(f"  成就: {len(ACHIEVEMENTS)} 个")
+    print(f"  积分: {pt_count} 条")
     print()
     print("  管理员账号:")
     print("    admin / admin123")

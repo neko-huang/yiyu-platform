@@ -236,3 +236,87 @@ export interface FinanceSummaryData {
   expense_by_category: Record<string, number>;
   record_count: number;
 }
+
+// ===== Phase 3 新增类型 =====
+
+/** AI 文案 */
+export interface Copywriting {
+  id: number;
+  event_id: number;
+  user_id: number;
+  platform: string;
+  content: string | null;
+  stage: string;
+  created_at: string;
+}
+
+/** 相册 */
+export interface AlbumPhoto {
+  id: number;
+  album_id: number;
+  user_id: number;
+  image_url: string;
+  caption: string | null;
+  ai_caption: string | null;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface Album {
+  id: number;
+  event_id: number;
+  user_id: number;
+  title: string;
+  description: string | null;
+  created_at: string;
+  photos: AlbumPhoto[];
+}
+
+/** 讨论 */
+export interface Discussion {
+  id: number;
+  event_id: number;
+  user_id: number;
+  content: string;
+  parent_id: number | null;
+  is_announcement: boolean;
+  created_at: string;
+  updated_at: string;
+  user_display_name?: string;
+}
+
+/** 成就与积分 */
+export interface Achievement {
+  id: number;
+  name: string;
+  description: string | null;
+  icon: string;
+  condition_type: string;
+  condition_value: number;
+  is_limited: boolean;
+}
+
+export interface UserAchievement {
+  id: number;
+  user_id: number;
+  achievement_id: number;
+  earned_at: string;
+  achievement?: Achievement;
+}
+
+export interface PointTransaction {
+  id: number;
+  user_id: number;
+  points: number;
+  tx_type: string;
+  description: string | null;
+  related_event_id: number | null;
+  created_at: string;
+}
+
+export interface PointsSummary {
+  total_points: number;
+  level: number;
+  achievements: UserAchievement[];
+  recent_transactions: PointTransaction[];
+}

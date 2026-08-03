@@ -3,7 +3,8 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import MapView from '../components/MapView';
 import { useAuth } from '../contexts/AuthContext';
 import client from '../api/client';
-import type { Event, Registration, FinanceRecord } from '../types';
+import type { Event, Registration, FinanceRecord, Copywriting } from '../types';
+import { generateCopywriting } from '../api/client';
 import { statusLabels, getEventTypeLabel } from '../utils/constants';
 import { getErrorMessage } from '../utils/errors';
 
@@ -54,6 +55,11 @@ export default function EventDetail() {
   const [registering, setRegistering] = useState(false);
   const [registrationStatus, setRegistrationStatus] = useState<string | null>(null);
   const [registerError, setRegisterError] = useState('');
+  const [showCopyModal, setShowCopyModal] = useState(false);
+  const [copyPlatform, setCopyPlatform] = useState('xiaohongshu');
+  const [copyStage, setCopyStage] = useState('before');
+  const [copywritingResult, setCopywritingResult] = useState<Copywriting | null>(null);
+  const [copyGenerating, setCopyGenerating] = useState(false);
 
   const eventId = Number(id);
 
@@ -119,6 +125,28 @@ export default function EventDetail() {
       }
     } finally {
       setRegistering(false);
+    }
+  };
+
+  const handleGenerateCopy = async () => {
+    setCopyGenerating(true);
+    try {
+      const result = await generateCopywriting(eventId, copyPlatform, copyStage);
+      setCopywritingResult(result);
+    } catch {
+      // Mock result
+      const mockResult: Copywriting = {
+        id: Date.now(),
+        event_id: eventId,
+        user_id: user?.id || 1,
+        platform: copyPlatform,
+        content: `🎉 ${event?.title || '精彩活动'}来了！\n\n${copyStage === 'before' ? '即将开始，快来报名吧！名额有限，先到先得～' : '活动圆满结束，感谢每一位参与者的支持！期待下次再聚！'}\n\n📍 ${event?.location_name || '待定'}\n🕐 ${event ? new Date(event.start_time).toLocaleString('zh-CN') : ''}\n\n#活动 #益屿`,
+        stage: copyStage,
+        created_at: new Date().toISOString(),
+      };
+      setCopywritingResult(mockResult);
+    } finally {
+      setCopyGenerating(false);
     }
   };
 
@@ -254,6 +282,43 @@ export default function EventDetail() {
               height="300px"
             />
           </div>
+
+          {/* Quick Actions */}
+          <div className="card p-5">
+            <h2 className="text-lg font-semibold text-gray-900 mb-3">快捷入口</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Link
+                to={`/events/${event.id}/album`}
+                className="flex items-center gap-3 p-4 rounded-lg border border-gray-100 hover:border-primary-200 hover:bg-primary-50/30 transition-all group"
+              >
+                <span className="text-2xl">📸</span>
+                <div>
+                  <p className="font-medium text-gray-900 text-sm group-hover:text-primary-600">查看相册</p>
+                  <p className="text-xs text-gray-400">活动精彩瞬间</p>
+                </div>
+              </Link>
+              <Link
+                to={`/events/${event.id}/discussion`}
+                className="flex items-center gap-3 p-4 rounded-lg border border-gray-100 hover:border-primary-200 hover:bg-primary-50/30 transition-all group"
+              >
+                <span className="text-2xl">💬</span>
+                <div>
+                  <p className="font-medium text-gray-900 text-sm group-hover:text-primary-600">参与讨论</p>
+                  <p className="text-xs text-gray-400">交流互动</p>
+                </div>
+              </Link>
+              <button
+                onClick={() => { setShowCopyModal(true); setCopywritingResult(null); }}
+                className="flex items-center gap-3 p-4 rounded-lg border border-gray-100 hover:border-primary-200 hover:bg-primary-50/30 transition-all group text-left"
+              >
+                <span className="text-2xl">✍️</span>
+                <div>
+                  <p className="font-medium text-gray-900 text-sm group-hover:text-primary-600">AI 生成文案</p>
+                  <p className="text-xs text-gray-400">一键生成宣传文案</p>
+                </div>
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Sidebar */}
@@ -354,6 +419,87 @@ export default function EventDetail() {
           )}
         </div>
       </div>
+      {/* AI Copywriting Modal */}
+      {showCopyModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowCopyModal(false)}>
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">✍️ AI 生成活动文案</h3>
+              <button onClick={() => setShowCopyModal(false)} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+            </div>
+
+            {!copywritingResult ? (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">发布平台</label>
+                  <select
+                    value={copyPlatform}
+                    onChange={(e) => setCopyPlatform(e.target.value)}
+                    className="input-field"
+                  >
+                    <option value="xiaohongshu">小红书</option>
+                    <option value="wechat">微信公众号</option>
+                    <option value="douyin">抖音</option>
+                    <option value="weibo">微博</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">文案阶段</label>
+                  <select
+                    value={copyStage}
+                    onChange={(e) => setCopyStage(e.target.value)}
+                    className="input-field"
+                  >
+                    <option value="before">活动预热</option>
+                    <option value="during">活动进行中</option>
+                    <option value="after">活动回顾</option>
+                  </select>
+                </div>
+                <button
+                  onClick={handleGenerateCopy}
+                  disabled={copyGenerating}
+                  className="btn-primary w-full"
+                >
+                  {copyGenerating ? '生成中...' : '✨ 生成文案'}
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="bg-gray-50 rounded-lg p-4 border border-gray-100">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="tag bg-primary-100 text-primary-700">
+                      {copywritingResult.platform === 'xiaohongshu' ? '小红书' :
+                       copywritingResult.platform === 'wechat' ? '微信公众号' :
+                       copywritingResult.platform === 'douyin' ? '抖音' : '微博'}
+                    </span>
+                    <span className="tag bg-gray-100 text-gray-600">
+                      {copywritingResult.stage === 'before' ? '预热' :
+                       copywritingResult.stage === 'during' ? '进行中' : '回顾'}
+                    </span>
+                  </div>
+                  <p className="text-gray-700 text-sm whitespace-pre-wrap leading-relaxed">{copywritingResult.content}</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(copywritingResult.content || '');
+                    }}
+                    className="btn-secondary flex-1"
+                  >
+                    📋 复制文案
+                  </button>
+                  <button
+                    onClick={() => setCopywritingResult(null)}
+                    className="btn-primary flex-1"
+                  >
+                    🔄 重新生成
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
