@@ -15,7 +15,7 @@ from services.auth import create_access_token, hash_password, verify_password
 router = APIRouter(prefix="/auth", tags=["认证"])
 
 
-@router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
+@router.post("/register", response_model=Token, status_code=status.HTTP_201_CREATED)
 async def register(payload: UserRegister, db: AsyncSession = Depends(get_db)):
     # 检查用户名和邮箱唯一性
     existing = await db.execute(
@@ -47,8 +47,15 @@ async def register(payload: UserRegister, db: AsyncSession = Depends(get_db)):
             detail="用户名或邮箱已存在",
         )
     await db.refresh(user)
+
+    # 注册成功后自动签发 token，与登录接口返回格式一致
+    token = create_access_token({"sub": str(user.id), "role": user.role})
     logger.info("新用户注册: %s (id=%s)", user.username, user.id)
-    return UserOut.model_validate(user)
+    return Token(
+        access_token=token,
+        token_type="bearer",
+        user=UserOut.model_validate(user),
+    )
 
 
 @router.post("/login", response_model=Token)
