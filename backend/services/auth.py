@@ -2,23 +2,28 @@
 
 from datetime import datetime, timedelta, timezone
 
+import bcrypt
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 
-from config import ACCESS_TOKEN_EXPIRE_HOURS, ALGORITHM, SECRET_KEY
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+from config import ACCESS_TOKEN_EXPIRE_HOURS, ALGORITHM, SECRET_KEY, logger
 
 
 # ---------------------------------------------------------------------------
-# 密码
+# 密码 — 直接使用 bcrypt 库，避免 passlib 与 bcrypt>=4.0 的兼容性问题
 # ---------------------------------------------------------------------------
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    """哈希密码，返回 bcrypt 格式字符串 ($2b$...)"""
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    """验证明文密码与哈希是否匹配"""
+    try:
+        return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
+    except (ValueError, TypeError) as exc:
+        logger.warning("密码验证异常: %s", exc)
+        return False
 
 
 # ---------------------------------------------------------------------------
