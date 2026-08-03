@@ -25,44 +25,156 @@
 
 ## 技术栈
 
-- **前端**: React 18 + TypeScript + Ant Design / TailwindCSS
-- **后端**: Python FastAPI
-- **数据库**: PostgreSQL + Redis
-- **地图**: 高德地图 SDK / Leaflet
-- **AI**: DeepSeek API (v4-flash / max)
-- **部署**: Docker + Nginx, 阿里云/腾讯云
+- **前端**: React 18 + TypeScript + Vite + TailwindCSS
+- **后端**: Python 3.11 + FastAPI + SQLAlchemy 2.0
+- **数据库**: SQLite (MVP) / PostgreSQL (生产)
+- **地图**: Leaflet + OpenStreetMap (免费，无需API Key)
+- **AI**: DeepSeek API (v4-flash)
+- **部署**: Docker + Nginx
 
-## 快速开始
+---
+
+## 本地部署指南
+
+### 环境要求
+
+| 依赖 | 版本 | 说明 |
+|------|------|------|
+| Python | 3.11+ | 后端运行环境 |
+| Node.js | 18+ | 前端运行环境 |
+| npm | 9+ | 前端包管理 |
+| Git | 任意 | 代码克隆 |
+
+### 第一步：克隆仓库
 
 ```bash
-# 克隆仓库
-git clone https://github.com/RootUser2129786127/yiyu-platform.git
+git clone https://github.com/neko-huang/yiyu-platform.git
 cd yiyu-platform
+```
 
-# 后端
+### 第二步：后端部署
+
+```bash
+# 进入后端目录
 cd backend
-pip install -r requirements.txt
-uvicorn main:app --reload
 
-# 前端
+# 创建虚拟环境（推荐）
+python -m venv venv
+
+# 激活虚拟环境
+# macOS/Linux:
+source venv/bin/activate
+# Windows:
+venv\Scripts\activate
+
+# 安装依赖
+pip install -r requirements.txt
+
+# 配置环境变量（可选，AI功能需要）
+# 方式1: 创建 .env 文件
+echo "DEEPSEEK_API_KEY=your-api-key-here" > .env
+
+# 方式2: 直接导出环境变量
+export DEEPSEEK_API_KEY=your-api-key-here  # macOS/Linux
+set DEEPSEEK_API_KEY=your-api-key-here     # Windows CMD
+
+# 初始化模拟数据（可选，生成测试账号和活动）
+python seed.py
+
+# 启动后端服务
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+
+**后端启动成功后：**
+- API 服务: http://localhost:8000
+- API 文档: http://localhost:8000/docs
+- 健康检查: http://localhost:8000/health
+
+**模拟数据账号：**
+| 角色 | 用户名 | 密码 |
+|------|--------|------|
+| 管理员 | admin | admin123 |
+| 管理员 | yiyu | yiyu123 |
+| 普通用户 | user1 ~ user8 | user123 |
+
+### 第三步：前端部署
+
+**新开一个终端窗口**，保持后端运行：
+
+```bash
+# 进入前端目录
 cd frontend
+
+# 安装依赖
 npm install
+
+# 配置环境变量（可选）
+# 创建 .env.local 文件
+echo "VITE_API_BASE_URL=http://localhost:8000" > .env.local
+
+# 启动开发服务器
 npm run dev
 ```
+
+**前端启动成功后：**
+- 访问地址: http://localhost:5173
+
+### 第四步：验证部署
+
+1. **打开浏览器** 访问 http://localhost:5173
+2. **登录测试**：使用 `admin` / `admin123` 登录
+3. **功能验证**：
+   - ✅ 首页显示活动列表
+   - ✅ 点击活动查看详情
+   - ✅ 地图页显示活动位置
+   - ✅ 创建活动表单正常
+   - ✅ AI策划页面可用（需配置API Key）
+
+---
+
+## 一键启动（Docker）
+
+如果你已安装 Docker，可以用一条命令启动全部：
+
+```bash
+# 配置环境变量
+cp .env.example .env
+# 编辑 .env，填入你的 DEEPSEEK_API_KEY
+
+# 启动服务
+docker-compose up -d
+
+# 访问
+# 前端: http://localhost:3000
+# 后端: http://localhost:8000
+```
+
+---
 
 ## 项目结构
 
 ```
 yiyu-platform/
-├── backend/          # FastAPI 后端
-├── frontend/         # React 前端
-├── docs/             # 项目文档
-│   ├── PRD.md        # 产品需求文档
-│   ├── ARCHITECTURE.md  # 系统架构
-│   ├── TECH_ROADMAP.md  # 技术路线图
-│   └── AI_ASSISTED_PLANNING.md  # AI方案生成功能设计
-├── docker/           # Docker 配置
-├── scripts/          # 部署/运维脚本
+├── backend/              # FastAPI 后端
+│   ├── main.py          # 入口文件
+│   ├── config.py        # 配置
+│   ├── database.py      # 数据库连接
+│   ├── models/          # 数据模型
+│   ├── schemas/         # Pydantic 验证
+│   ├── routers/         # API 路由
+│   ├── services/        # 业务逻辑
+│   ├── seed.py          # 模拟数据
+│   └── requirements.txt # Python 依赖
+├── frontend/             # React 前端
+│   ├── src/
+│   │   ├── pages/       # 页面组件
+│   │   ├── components/  # 通用组件
+│   │   ├── api/         # API 请求
+│   │   └── contexts/    # React Context
+│   ├── package.json     # Node 依赖
+│   └── vite.config.js   # Vite 配置
+├── docs/                 # 项目文档
+├── docker-compose.yml    # Docker 编排
 └── README.md
 ```
 
