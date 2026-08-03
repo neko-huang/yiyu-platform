@@ -66,12 +66,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = useCallback(async (data: LoginRequest) => {
-    const formData = new URLSearchParams();
-    formData.append('username', data.username);
-    formData.append('password', data.password);
-
-    const res = await client.post('/auth/login', formData, {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    const res = await client.post('/auth/login', {
+      username: data.username,
+      password: data.password,
     });
 
     const { access_token, user: userInfo } = res.data;
