@@ -113,3 +113,16 @@ class EventMapItem(BaseModel):
     longitude: float | None = None
     start_time: datetime | None = None
     category: str | None = None
+
+
+class RecommendationItem(EventOut):
+    """推荐活动项 — 包含匹配原因和匹配分数"""
+    match_reasons: list[str] = []
+    match_score: float = 0.0
+
+
+class RecommendationListOut(BaseModel):
+    """推荐活动列表响应"""
+    total: int
+    items: list[RecommendationItem]
+    strategy: str = "default"  # personalized / popular / default

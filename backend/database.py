@@ -36,7 +36,13 @@ async def get_db() -> AsyncSession:
 
 
 async def init_db():
-    """创建所有表（开发 / seed 时使用）"""
+    """创建所有表（开发 / seed 时使用）
+
+    确保所有模型在调用 create_all 前已被导入并注册到 Base.metadata。
+    """
+    # 显式导入所有模型，确保 Base.metadata 包含全部表定义
+    import models  # noqa: F401 — 触发 models/__init__.py 中的全部导入
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     logger.info("数据库表已就绪")

@@ -8,18 +8,19 @@
 创建:
     - 2 个管理员 (admin/admin123, yiyu/yiyu123)
     - 8 个普通用户
+    - 10 个用户画像 (含兴趣标签、位置等)
     - 10 个不同类别的活动
     - 每个活动有报名记录和财务记录
 """
 
 import asyncio
 import random
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import select
 
 from database import async_session, engine, init_db
-from models import AIPlan, Event, FinanceRecord, Registration, User
+from models import AIPlan, Event, FinanceRecord, Registration, User, UserProfile
 from services.auth import hash_password
 
 # ---------------------------------------------------------------------------
@@ -47,6 +48,83 @@ USERS = [
     {"username": "zhoumin", "email": "zhoumin@yiyu.com", "password": "user123",
      "display_name": "周敏", "role": "user", "tags": ["艺术", "讲座", "音乐"]},
 ]
+
+# ---------------------------------------------------------------------------
+# 用户画像数据 (与 USERS 一一对应，按 username 关联)
+# ---------------------------------------------------------------------------
+PROFILES = {
+    "admin": {
+        "bio": "益屿平台系统管理员，负责平台运营与活动审核。",
+        "interests": ["管理", "运营", "活动策划"],
+        "location": "上海",
+        "birth_date": date(1988, 3, 15),
+        "gender": "male",
+    },
+    "yiyu": {
+        "bio": "益屿创始人，热爱户外、读书和音乐。致力于打造有温度的社区活动平台。",
+        "interests": ["策划", "户外", "读书", "音乐", "徒步"],
+        "location": "上海",
+        "birth_date": date(1990, 7, 20),
+        "gender": "female",
+    },
+    "lina": {
+        "bio": "自由摄影师 & 音乐爱好者，喜欢记录生活中的美好瞬间。",
+        "interests": ["音乐", "摄影", "艺术", "现场演出"],
+        "location": "上海",
+        "birth_date": date(1995, 5, 10),
+        "gender": "female",
+    },
+    "wangfang": {
+        "bio": "文学硕士，读书会发起人。相信阅读改变生活。",
+        "interests": ["读书", "写作", "文学", "分享"],
+        "location": "上海",
+        "birth_date": date(1992, 11, 3),
+        "gender": "female",
+    },
+    "zhangwei": {
+        "bio": "健身教练，户外运动达人。每周至少三次户外活动。",
+        "interests": ["运动", "健身", "户外", "跑步", "羽毛球"],
+        "location": "上海",
+        "birth_date": date(1991, 8, 25),
+        "gender": "male",
+    },
+    "chenyu": {
+        "bio": "互联网产品经理，关注 AI 与科技趋势。业余组织技术沙龙。",
+        "interests": ["科技", "讲座", "AI", "编程", "职业发展"],
+        "location": "上海",
+        "birth_date": date(1993, 2, 14),
+        "gender": "male",
+    },
+    "liuyang": {
+        "bio": "独立音乐人 & 户外爱好者。吉他从不离手，登山鞋随时待命。",
+        "interests": ["音乐", "户外", "徒步", "民谣"],
+        "location": "上海",
+        "birth_date": date(1994, 6, 18),
+        "gender": "male",
+    },
+    "zhaojing": {
+        "bio": "美食博主，读书会常客。用文字和味蕾探索世界。",
+        "interests": ["读书", "美食", "探店", "写作"],
+        "location": "上海",
+        "birth_date": date(1996, 9, 22),
+        "gender": "female",
+    },
+    "sunhao": {
+        "bio": "体育摄影师，用镜头记录运动瞬间。马拉松完赛者。",
+        "interests": ["运动", "摄影", "跑步", "马拉松"],
+        "location": "上海",
+        "birth_date": date(1990, 12, 5),
+        "gender": "male",
+    },
+    "zhoumin": {
+        "bio": "艺术策展人，热爱音乐与讲座。在感性与理性之间寻找平衡。",
+        "interests": ["艺术", "讲座", "音乐", "策展", "手工"],
+        "location": "上海",
+        "birth_date": date(1989, 4, 12),
+        "gender": "female",
+    },
+}
+
 
 # ---------------------------------------------------------------------------
 # 活动数据 (10 个不同类别)
@@ -271,6 +349,33 @@ async def seed():
         print(f"   ✅ 创建 {len(admins)} 个管理员 + {len(regular_users)} 个普通用户")
 
         # ---------------------------------------------------------------
+        # 1.5. 创建用户画像
+        # ---------------------------------------------------------------
+        print("🎨 创建用户画像...")
+        profile_count = 0
+        for user in user_objs:
+            profile_data = PROFILES.get(user.username)
+            if not profile_data:
+                continue
+            profile = UserProfile(
+                user_id=user.id,
+                avatar_url=user.avatar_url,
+                bio=profile_data["bio"],
+                interests=profile_data["interests"],
+                location=profile_data["location"],
+                birth_date=profile_data["birth_date"],
+                gender=profile_data["gender"],
+                activity_count=random.randint(1, 15),
+                participation_count=random.randint(3, 20),
+                rating_avg=round(random.uniform(3.5, 5.0), 1),
+            )
+            session.add(profile)
+            profile_count += 1
+
+        await session.flush()
+        print(f"   ✅ 创建 {profile_count} 个用户画像")
+
+        # ---------------------------------------------------------------
         # 2. 创建活动
         # ---------------------------------------------------------------
         print("📅 创建活动...")
@@ -427,6 +532,7 @@ async def seed():
     print("✨ 种子数据创建完成！")
     print("=" * 50)
     print(f"  用户: {len(USERS)} 个 (2 管理员 + 8 普通)")
+    print(f"  用户画像: {len(PROFILES)} 个")
     print(f"  活动: {len(EVENTS)} 个")
     print(f"  报名: {reg_count} 条")
     print(f"  财务: {fin_count} 条")

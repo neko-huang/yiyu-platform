@@ -66,4 +66,77 @@ export async function getWithRetry<T>(url: string, maxRetries = 2): Promise<T> {
   throw lastError;
 }
 
+// ===== Phase 1 API 方法 =====
+import type {
+  Profile,
+  PublicProfile,
+  UpdateProfileRequest,
+  Recommendation,
+  SearchResult,
+  SearchParams,
+  UploadResponse,
+} from '../types';
+
+/** 获取当前用户画像 */
+export async function getProfile(): Promise<Profile> {
+  const res = await client.get<Profile>('/profiles/me');
+  return res.data;
+}
+
+/** 更新当前用户画像 */
+export async function updateProfile(data: UpdateProfileRequest): Promise<Profile> {
+  const res = await client.put<Profile>('/profiles/me', data);
+  return res.data;
+}
+
+/** 获取其他用户的公开画像 */
+export async function getUserProfile(userId: number): Promise<PublicProfile> {
+  const res = await client.get<PublicProfile>(`/profiles/${userId}`);
+  return res.data;
+}
+
+/** 添加兴趣标签 */
+export async function addInterest(tag: string): Promise<Profile> {
+  const res = await client.post<Profile>('/profiles/me/interests', { tag });
+  return res.data;
+}
+
+/** 移除兴趣标签 */
+export async function removeInterest(tag: string): Promise<Profile> {
+  const res = await client.delete<Profile>(`/profiles/me/interests/${encodeURIComponent(tag)}`);
+  return res.data;
+}
+
+/** 上传头像（FormData） */
+export async function uploadAvatar(file: File): Promise<UploadResponse> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await client.post<UploadResponse>('/upload/avatar', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return res.data;
+}
+
+/** 上传图片（FormData） */
+export async function uploadImage(file: File): Promise<UploadResponse> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await client.post<UploadResponse>('/upload/image', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return res.data;
+}
+
+/** 搜索活动 */
+export async function searchEvents(params: SearchParams): Promise<SearchResult> {
+  const res = await client.get<SearchResult>('/events/search', { params });
+  return res.data;
+}
+
+/** 获取推荐活动 */
+export async function getRecommendations(): Promise<Recommendation[]> {
+  const res = await client.get<Recommendation[]>('/events/recommendations');
+  return res.data;
+}
+
 export { client as default };

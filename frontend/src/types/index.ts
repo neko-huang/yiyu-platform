@@ -82,3 +82,79 @@ export interface DashboardStats {
   total_registrations: number;
   total_income: number;
 }
+
+
+// ===== Phase 1 新增类型 =====
+
+/** 用户画像（完整信息，本人可见） */
+export interface Profile {
+  user_id: number;
+  username: string;
+  display_name: string;
+  email: string;
+  avatar_url?: string;
+  bio: string;
+  gender: 'male' | 'female' | 'other' | '';
+  birthday: string;
+  city: string;
+  tags: string[];
+  stats: ProfileStats;
+}
+
+/** 用户画像统计 */
+export interface ProfileStats {
+  organized_count: number;
+  participated_count: number;
+  avg_rating: number;
+}
+
+/** 公开用户画像（他人可见，不含敏感信息） */
+export interface PublicProfile {
+  user_id: number;
+  username: string;
+  display_name: string;
+  avatar_url?: string;
+  bio: string;
+  tags: string[];
+  stats: ProfileStats;
+}
+
+/** 更新画像的请求体 */
+export interface UpdateProfileRequest {
+  display_name?: string;
+  bio?: string;
+  gender?: 'male' | 'female' | 'other' | '';
+  birthday?: string;
+  city?: string;
+}
+
+/** 推荐活动（带匹配原因） */
+export interface Recommendation {
+  event: Event;
+  match_reasons: string[];
+}
+
+/** 搜索参数 */
+export interface SearchParams {
+  q?: string;
+  category?: string;
+  city?: string;
+  start_date?: string;
+  end_date?: string;
+  sort?: 'latest' | 'popular';
+  page?: number;
+  page_size?: number;
+}
+
+/** 搜索结果（分页） */
+export interface SearchResult {
+  items: Event[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+/** 上传响应 */
+export interface UploadResponse {
+  url: string;
+}

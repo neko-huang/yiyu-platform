@@ -6,15 +6,18 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.exc import IntegrityError
 
-from config import CORS_ORIGINS, logger
+from config import BASE_DIR, CORS_ORIGINS, logger
 from database import init_db
 from routers.ai import router as ai_router
 from routers.auth import router as auth_router
 from routers.events import router as events_router
 from routers.finance import router as finance_router
+from routers.profiles import router as profiles_router
 from routers.registrations import router as registrations_router
+from routers.upload import router as upload_router
 
 
 @asynccontextmanager
@@ -29,8 +32,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="益屿活动管理平台 API",
-    description="社区活动管理平台后端 — 活动管理、报名、财务、AI 方案生成",
-    version="1.0.0",
+    description="社区活动管理平台后端 — 活动管理、报名、财务、AI 方案生成、用户画像、推荐系统",
+    version="1.1.0",
     lifespan=lifespan,
 )
 
@@ -42,6 +45,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ---------------------------------------------------------------------------
+# 静态文件 — 提供上传文件的访问
+# ---------------------------------------------------------------------------
+uploads_path = BASE_DIR / "uploads"
+uploads_path.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(uploads_path)), name="uploads")
 
 
 # ---------------------------------------------------------------------------
@@ -72,13 +82,15 @@ app.include_router(events_router, prefix=API_PREFIX)
 app.include_router(registrations_router, prefix=API_PREFIX)
 app.include_router(finance_router, prefix=API_PREFIX)
 app.include_router(ai_router, prefix=API_PREFIX)
+app.include_router(profiles_router, prefix=API_PREFIX)
+app.include_router(upload_router, prefix=API_PREFIX)
 
 
 @app.get("/")
 async def root():
     return {
         "name": "益屿活动管理平台 API",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "docs": "/docs",
     }
 

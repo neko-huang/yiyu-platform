@@ -11,6 +11,8 @@ from models import Event, User
 from services.auth import decode_access_token
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+# 用于公开接口的可选认证（如推荐系统），无 token 或 token 无效时返回 None
+oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
 
 
 async def get_current_user(
@@ -35,6 +37,26 @@ async def get_current_user(
     if user is None:
         raise credentials_exception
     return user
+
+
+async def get_optional_current_user(
+    token: str | None = Depends(oauth2_scheme_optional),
+    db: AsyncSession = Depends(get_db),
+) -> User | None:
+    """可选认证 — 有 token 且有效时返回用户，否则返回 None（不报错）"""
+    if token is None:
+        return None
+
+    payload = decode_access_token(token)
+    if payload is None:
+        return None
+
+    user_id = payload.get("sub")
+    if user_id is None:
+        return None
+
+    result = await db.execute(select(User).where(User.id == int(user_id)))
+    return result.scalar_one_or_none()
 
 
 async def get_admin_user(current_user: User = Depends(get_current_user)) -> User:

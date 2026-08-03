@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import EventCard from '../components/EventCard';
-import client from '../api/client';
-import type { Event } from '../types';
-import { categories } from '../utils/constants';
+import client, { getRecommendations } from '../api/client';
+import type { Event, Recommendation } from '../types';
+import { categories, formatDate, getEventTypeLabel } from '../utils/constants';
 
 // 模拟数据 - 后端未启动时使用
 const mockEvents: Event[] = [
@@ -128,6 +128,10 @@ export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState('全部');
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
+  // 推荐活动
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [recLoading, setRecLoading] = useState(true);
+
   const fetchEvents = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -167,6 +171,36 @@ export default function Home() {
     setVisibleCount(PAGE_SIZE);
   }, [fetchEvents]);
 
+  // 获取推荐活动
+  const fetchRecommendations = useCallback(async () => {
+    setRecLoading(true);
+    try {
+      const data = await getRecommendations();
+      setRecommendations(data);
+    } catch {
+      // fallback — 构造模拟推荐
+      setRecommendations(
+        mockEvents.slice(0, 4).map((event, i) => ({
+          event,
+          match_reasons:
+            i === 0
+              ? ['基于你的兴趣: 户外', '同城市热门活动']
+              : i === 1
+                ? ['基于你的兴趣: 音乐']
+                : i === 2
+                  ? ['好友也在参与']
+                  : ['近期热门'],
+        })),
+      );
+    } finally {
+      setRecLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchRecommendations();
+  }, [fetchRecommendations]);
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     fetchEvents();
@@ -186,6 +220,42 @@ export default function Home() {
         <h1 className="text-3xl font-bold text-gray-900 mb-2">发现精彩活动</h1>
         <p className="text-gray-500">探索身边的活动，遇见志同道合的朋友</p>
       </div>
+
+      {/* ===== 为你推荐 ===== */}
+      {!recLoading && recommendations.length > 0 && (
+        <section className="mb-8" aria-label="为你推荐">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-2xl">✨</span>
+            <h2 className="text-xl font-bold text-gray-900">为你推荐</h2>
+            <span className="text-sm text-gray-400">基于你的兴趣偏好</span>
+          </div>
+          <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 snap-x snap-mandatory scrollbar-thin">
+            {recommendations.map((rec) => (
+              <RecommendationCard key={rec.event.id} recommendation={rec} />
+            ))}
+          </div>
+        </section>
+      )}
+      {/* 推荐加载中 */}
+      {recLoading && (
+        <section className="mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-2xl">✨</span>
+            <div className="h-6 w-32 bg-gray-200 rounded animate-pulse" />
+          </div>
+          <div className="flex gap-4 overflow-hidden">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="card overflow-hidden animate-pulse flex-shrink-0 w-72">
+                <div className="h-32 bg-gray-200" />
+                <div className="p-4 space-y-2">
+                  <div className="h-4 bg-gray-200 rounded w-3/4" />
+                  <div className="h-3 bg-gray-200 rounded w-1/2" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Search bar */}
       <form onSubmit={handleSearch} className="mb-6">
@@ -212,6 +282,10 @@ export default function Home() {
           <button type="submit" className="btn-primary px-8">
             搜索
           </button>
+          <Link to="/search" className="btn-secondary px-4 flex items-center gap-1" aria-label="高级搜索">
+            <span>🔍</span>
+            <span className="hidden sm:inline">高级搜索</span>
+          </Link>
         </div>
       </form>
 
@@ -293,5 +367,69 @@ export default function Home() {
         </>
       )}
     </div>
+  );
+}
+
+/** 推荐活动卡片（横向滚动，带匹配原因） */
+function RecommendationCard({ recommendation }: { recommendation: Recommendation }) {
+  const { event, match_reasons } = recommendation;
+  return (
+    <Link
+      to={`/events/${event.id}`}
+      className="card overflow-hidden hover:shadow-lg transition-shadow duration-200 group flex-shrink-0 w-72 snap-start"
+      aria-label={`推荐活动：${event.title}`}
+    >
+      {/* Cover */}
+      <div className="h-32 bg-gradient-to-br from-primary-400 to-primary-700 relative overflow-hidden">
+        {event.cover_image ? (
+          <img
+            src={event.cover_image}
+            alt={event.title}
+            loading="lazy"
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <span className="text-white text-3xl font-bold opacity-50">{event.category}</span>
+          </div>
+        )}
+        <span className="absolute top-2 left-2 tag bg-white/90 text-gray-700 backdrop-blur-sm">
+          {getEventTypeLabel(event.type)}
+        </span>
+        <span className="absolute top-2 right-2 tag bg-white/90 text-gray-800 backdrop-blur-sm font-semibold">
+          {event.price === 0 ? '免费' : `¥${event.price}`}
+        </span>
+      </div>
+
+      {/* Content */}
+      <div className="p-4">
+        <h3 className="font-semibold text-gray-900 mb-1 line-clamp-1 group-hover:text-primary-600 transition-colors">
+          {event.title}
+        </h3>
+        <p className="text-xs text-gray-400 mb-2">
+          📅 {formatDate(event.start_time)} · 📍 {event.location_name}
+        </p>
+
+        {/* 匹配原因标签 */}
+        {match_reasons.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-2">
+            {match_reasons.map((reason, idx) => (
+              <span
+                key={idx}
+                className="tag bg-primary-50 text-primary-600 text-xs"
+              >
+                💡 {reason}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* 参与人数 */}
+        <div className="flex items-center justify-between text-xs text-gray-400">
+          <span>👥 {event.current_participants}/{event.max_participants}</span>
+          <span className="text-primary-500 group-hover:translate-x-1 transition-transform">查看 →</span>
+        </div>
+      </div>
+    </Link>
   );
 }
