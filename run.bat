@@ -44,7 +44,7 @@ if "%~1"=="" goto :menu
 if "%~1"=="all" goto :start_all
 if "%~1"=="backend" goto :start_backend
 if "%~1"=="frontend" goto :start_frontend
-if "%~1"=="stop" goto :stop_all
+if "%~1"=="stop" goto :do_stop_all
 echo Unknown command: %~1
 echo Usage: run.bat [all^|backend^|frontend^|stop]
 echo.
@@ -81,31 +81,29 @@ goto :menu
 call :do_start_backend
 if errorlevel 1 (
     echo.
-    pause
-    exit /b 1
+    echo  [ERROR] Backend failed to start.
+    echo.
+    goto :menu
 )
 call :do_start_frontend
 if errorlevel 1 (
     echo.
-    pause
-    exit /b 1
+    echo  [ERROR] Frontend failed to start.
+    echo.
+    goto :menu
 )
 echo.
 echo  ========================================
 echo   [OK] All services started!
-echo   Backend: http://localhost:8000
+echo   Backend:  http://localhost:8000
 echo   Frontend: http://localhost:5173
 echo   API Docs: http://localhost:8000/docs
 echo  ========================================
 echo.
-echo  Closing this window will NOT stop services.
-echo  To stop: run.bat stop
-echo.
-pause
-exit /b 0
+goto :menu
 
 :restart_all
-call :stop_all
+call :do_stop_all
 timeout /t 2 /nobreak >nul
 goto :start_all
 
@@ -113,41 +111,44 @@ goto :start_all
 call :do_start_backend
 if errorlevel 1 (
     echo.
-    pause
-    exit /b 1
+    echo  [ERROR] Backend failed to start.
+    echo.
+    goto :menu
 )
 echo.
 echo  [OK] Backend: http://localhost:8000
 echo  [OK] API Docs: http://localhost:8000/docs
 echo.
-pause
-exit /b 0
+goto :menu
 
 :start_frontend
 call :do_start_frontend
 if errorlevel 1 (
     echo.
-    pause
-    exit /b 1
+    echo  [ERROR] Frontend failed to start.
+    echo.
+    goto :menu
 )
 echo.
 echo  [OK] Frontend: http://localhost:5173
 echo.
-pause
-exit /b 0
+goto :menu
 
 :: ==================== Stop ====================
 
 :stop_all
+call :do_stop_all
+echo  [OK] All services stopped.
+echo.
+goto :menu
+
+:: ==================== Subroutines ====================
+
+:do_stop_all
 echo Stopping all services...
 for /f "tokens=5" %%p in ('netstat -aon 2^>nul ^| findstr ":8000" ^| findstr "LISTENING" 2^>nul') do taskkill /PID %%p /F >nul 2>&1
 for /f "tokens=5" %%p in ('netstat -aon 2^>nul ^| findstr ":5173" ^| findstr "LISTENING" 2^>nul') do taskkill /PID %%p /F >nul 2>&1
-echo  [OK] All services stopped.
-echo.
-pause
 exit /b 0
-
-:: ==================== Subroutines ====================
 
 :do_start_backend
 echo Starting backend...
