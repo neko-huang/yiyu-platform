@@ -158,3 +158,81 @@ export interface SearchResult {
 export interface UploadResponse {
   url: string;
 }
+
+// ===== Phase 2 新增类型 =====
+
+/** 活动复盘报告 */
+export interface Review {
+  id: number;
+  event_id: number;
+  user_id: number;
+  overall_rating: number;
+  attendance_rate: number | null;
+  highlights: string | null;
+  issues: string | null;
+  improvements: string | null;
+  key_learnings: string | null;
+  reuse_suggestion: 'yes' | 'no' | 'maybe';
+  ai_summary: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ReviewCreateRequest {
+  overall_rating: number;
+  attendance_rate?: number;
+  highlights?: string;
+  issues?: string;
+  improvements?: string;
+  key_learnings?: string;
+  reuse_suggestion: 'yes' | 'no' | 'maybe';
+}
+
+export interface ReviewListResponse {
+  total: number;
+  items: Review[];
+}
+
+/** SOP 模板 */
+export interface SOPTemplate {
+  id: number;
+  user_id: number;
+  name: string;
+  category: string;
+  description: string | null;
+  content: string | null;
+  tags: string[];
+  source_event_id: number | null;
+  is_public: boolean;
+  is_active: boolean;
+  usage_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SOPTemplateCreateRequest {
+  name: string;
+  category: string;
+  description?: string;
+  content?: string;
+  tags?: string[];
+  is_public?: boolean;
+  source_event_id?: number;
+}
+
+export interface SOPTemplateListResponse {
+  total: number;
+  page: number;
+  page_size: number;
+  items: SOPTemplate[];
+}
+
+/** 财务汇总 */
+export interface FinanceSummaryData {
+  total_income: number;
+  total_expense: number;
+  net_balance: number;
+  income_by_category: Record<string, number>;
+  expense_by_category: Record<string, number>;
+  record_count: number;
+}

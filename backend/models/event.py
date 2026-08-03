@@ -36,3 +36,4 @@ class Event(Base):
     # Relationships
     registrations = relationship("Registration", back_populates="event", cascade="all, delete-orphan")
     finance_records = relationship("FinanceRecord", back_populates="event", cascade="all, delete-orphan")
+    reviews = relationship("EventReview", back_populates="event", cascade="all, delete-orphan")

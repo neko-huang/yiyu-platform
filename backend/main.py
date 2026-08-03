@@ -17,6 +17,8 @@ from routers.events import router as events_router
 from routers.finance import router as finance_router
 from routers.profiles import router as profiles_router
 from routers.registrations import router as registrations_router
+from routers.reviews import router as reviews_router
+from routers.sop_templates import router as sop_templates_router
 from routers.upload import router as upload_router
 
 
@@ -83,6 +85,8 @@ app.include_router(registrations_router, prefix=API_PREFIX)
 app.include_router(finance_router, prefix=API_PREFIX)
 app.include_router(ai_router, prefix=API_PREFIX)
 app.include_router(profiles_router, prefix=API_PREFIX)
+app.include_router(reviews_router, prefix=API_PREFIX)
+app.include_router(sop_templates_router, prefix=API_PREFIX)
 app.include_router(upload_router, prefix=API_PREFIX)
 
 

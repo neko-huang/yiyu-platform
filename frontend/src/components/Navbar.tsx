@@ -6,6 +6,7 @@ const navItems = [
   { path: '/', label: '首页', icon: '🏠' },
   { path: '/map', label: '地图', icon: '🗺️' },
   { path: '/ai-plan', label: 'AI策划', icon: '✨' },
+  { path: '/sop', label: 'SOP模板', icon: '📋' },
 ];
 
 const adminNavItems = [

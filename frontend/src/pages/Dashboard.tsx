@@ -3,6 +3,14 @@ import { Link } from 'react-router-dom';
 import client from '../api/client';
 import type { Event, DashboardStats } from '../types';
 
+// 模拟财务数据
+const mockFinanceData = {
+  total_income: 18650,
+  total_expense: 12300,
+  income_by_category: { '报名费': 12000, '赞助': 5000, '其他': 1650 },
+  expense_by_category: { '场地费': 4500, '物料': 3200, '餐饮': 2800, '人工': 1200, '其他': 600 },
+};
+
 // 模拟数据
 const mockStats: DashboardStats = {
   total_events: 12,
@@ -34,6 +42,7 @@ const statusLabels: Record<string, string> = {
 export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats>(mockStats);
   const [recentEvents, setRecentEvents] = useState<Event[]>([]);
+  const [financeData, setFinanceData] = useState(mockFinanceData);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
@@ -220,6 +229,127 @@ export default function Dashboard() {
                       </div>
                     ))}
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Finance Overview */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+            {/* Income vs Expense bar chart */}
+            <div className="card p-6">
+              <h2 className="font-semibold text-gray-900 mb-4">财务概览</h2>
+              <div className="space-y-4">
+                {/* Income bar */}
+                <div>
+                  <div className="flex items-center justify-between text-sm mb-1">
+                    <span className="text-green-600 font-medium">总收入</span>
+                    <span className="font-bold text-green-600">¥{financeData.total_income.toLocaleString()}</span>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-4">
+                    <div
+                      className="bg-gradient-to-r from-green-400 to-green-500 h-4 rounded-full transition-all duration-700"
+                      style={{ width: `${Math.min((financeData.total_income / Math.max(financeData.total_income, financeData.total_expense)) * 100, 100)}%` }}
+                    />
+                  </div>
+                </div>
+                {/* Expense bar */}
+                <div>
+                  <div className="flex items-center justify-between text-sm mb-1">
+                    <span className="text-red-600 font-medium">总支出</span>
+                    <span className="font-bold text-red-600">¥{financeData.total_expense.toLocaleString()}</span>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-4">
+                    <div
+                      className="bg-gradient-to-r from-red-400 to-red-500 h-4 rounded-full transition-all duration-700"
+                      style={{ width: `${Math.min((financeData.total_expense / Math.max(financeData.total_income, financeData.total_expense)) * 100, 100)}%` }}
+                    />
+                  </div>
+                </div>
+                {/* Net balance */}
+                <div className="pt-3 border-t border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-500">净收入</span>
+                    <span className={`text-lg font-bold ${financeData.total_income - financeData.total_expense >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      ¥{(financeData.total_income - financeData.total_expense).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Category breakdown */}
+              <div className="mt-6 pt-4 border-t border-gray-100">
+                <h3 className="text-sm font-medium text-gray-700 mb-3">收入构成</h3>
+                <div className="space-y-2">
+                  {Object.entries(financeData.income_by_category).map(([cat, amount]) => {
+                    const pct = (amount / financeData.total_income) * 100;
+                    return (
+                      <div key={cat} className="flex items-center gap-2">
+                        <span className="text-xs text-gray-500 w-14 truncate">{cat}</span>
+                        <div className="flex-1 bg-gray-100 rounded-full h-2">
+                          <div className="bg-green-400 h-2 rounded-full" style={{ width: `${pct}%` }} />
+                        </div>
+                        <span className="text-xs text-gray-600 w-16 text-right">¥{amount.toLocaleString()}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Expense breakdown pie chart */}
+            <div className="card p-6">
+              <h2 className="font-semibold text-gray-900 mb-4">支出构成</h2>
+              <div className="flex items-center gap-6">
+                {/* SVG pie chart */}
+                <div className="relative w-32 h-32 flex-shrink-0">
+                  <svg className="w-32 h-32 -rotate-90" viewBox="0 0 100 100">
+                    {(() => {
+                      const entries = Object.entries(financeData.expense_by_category);
+                      const total = entries.reduce((s, [, v]) => s + v, 0) || 1;
+                      const colors = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6'];
+                      let offset = 0;
+                      return entries.map(([cat, amount], idx) => {
+                        const pct = (amount / total) * 100;
+                        const dashLen = pct * 2.51;
+                        const el = (
+                          <circle
+                            key={cat}
+                            cx="50" cy="50" r="40"
+                            fill="none"
+                            stroke={colors[idx % colors.length]}
+                            strokeWidth="14"
+                            strokeDasharray={`${dashLen} ${251 - dashLen}`}
+                            strokeDashoffset={-offset * 2.51}
+                          />
+                        );
+                        offset += pct;
+                        return el;
+                      });
+                    })()}
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-sm font-bold text-gray-900">¥{(financeData.total_expense / 1000).toFixed(1)}k</span>
+                  </div>
+                </div>
+                {/* Legend */}
+                <div className="space-y-2 flex-1">
+                  {Object.entries(financeData.expense_by_category).map(([cat, amount], idx) => {
+                    const colors = ['bg-red-500', 'bg-orange-500', 'bg-yellow-500', 'bg-green-500', 'bg-blue-500', 'bg-purple-500'];
+                    const pct = ((amount / financeData.total_expense) * 100).toFixed(1);
+                    return (
+                      <div key={cat} className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className={`w-2.5 h-2.5 rounded-full ${colors[idx % colors.length]}`} />
+                          <span className="text-gray-600">{cat}</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="font-medium text-gray-900">¥{amount.toLocaleString()}</span>
+                          <span className="text-xs text-gray-400 ml-1">({pct}%)</span>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>

@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, FormEvent } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import client from '../api/client';
-import type { Event, Registration, FinanceRecord } from '../types';
+import type { Event, Registration, FinanceRecord, Review } from '../types';
 import { statusLabels, eventStatusLabels } from '../utils/constants';
 
-type Tab = 'registrations' | 'finance' | 'settings';
+type Tab = 'registrations' | 'finance' | 'review' | 'settings';
 
 export default function EventManage() {
   const { id } = useParams<{ id: string }>();
@@ -27,6 +27,20 @@ export default function EventManage() {
   const [finSubmitting, setFinSubmitting] = useState(false);
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
 
+  // Review state
+  const [review, setReview] = useState<Review | null>(null);
+  const [reviewForm, setReviewForm] = useState({
+    overall_rating: 4,
+    attendance_rate: 0,
+    highlights: '',
+    issues: '',
+    improvements: '',
+    key_learnings: '',
+    reuse_suggestion: 'maybe' as 'yes' | 'no' | 'maybe',
+  });
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -38,6 +52,24 @@ export default function EventManage() {
       setEvent(eventRes.data);
       setRegistrations(regRes.data);
       setFinanceRecords(finRes.data);
+
+      // 尝试加载复盘报告（可能不存在）
+      try {
+        const reviewRes = await client.get(`/reviews/events/${id}/review`);
+        const r = reviewRes.data;
+        setReview(r);
+        setReviewForm({
+          overall_rating: r.overall_rating,
+          attendance_rate: r.attendance_rate || 0,
+          highlights: r.highlights || '',
+          issues: r.issues || '',
+          improvements: r.improvements || '',
+          key_learnings: r.key_learnings || '',
+          reuse_suggestion: r.reuse_suggestion,
+        });
+      } catch {
+        // 没有复盘报告，使用默认表单
+      }
     } catch {
       // 模拟数据
       setEvent({
@@ -140,6 +172,57 @@ export default function EventManage() {
     });
   };
 
+  const handleSaveReview = async (e: FormEvent) => {
+    e.preventDefault();
+    if (reviewSubmitting) return;
+    setReviewSubmitting(true);
+
+    try {
+      if (review) {
+        // 更新已有复盘
+        const res = await client.put(`/reviews/events/${id}/review`, reviewForm);
+        setReview(res.data);
+      } else {
+        // 创建新复盘
+        const res = await client.post(`/reviews/events/${id}/review`, reviewForm);
+        setReview(res.data);
+      }
+    } catch {
+      // 模拟保存成功
+      const mockReview: Review = {
+        id: Date.now(),
+        event_id: eventId,
+        user_id: event?.organizer_id || 1,
+        ...reviewForm,
+        ai_summary: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      setReview(mockReview);
+    } finally {
+      setReviewSubmitting(false);
+    }
+  };
+
+  const handleGenerateAIReview = async () => {
+    if (aiLoading) return;
+    setAiLoading(true);
+    try {
+      const res = await client.post(`/reviews/events/${id}/review/ai-summary`);
+      setReview(res.data);
+    } catch {
+      // 模拟 AI 摘要
+      if (review) {
+        setReview({
+          ...review,
+          ai_summary: '## 总体评价\n活动整体表现良好，参与度高，预算控制在预期范围内。\n\n## 值得复用的经验\n1. 提前2周开始宣传效果显著\n2. 签到流程顺畅\n3. 互动环节设计合理\n\n## 需要改进的方面\n1. 场地选择可考虑更大空间\n2. 物料准备可更充分',
+        });
+      }
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="max-w-6xl mx-auto px-4 py-8">
@@ -166,6 +249,7 @@ export default function EventManage() {
   const tabs: { key: Tab; label: string; icon: string }[] = [
     { key: 'registrations', label: '报名管理', icon: '👥' },
     { key: 'finance', label: '财务管理', icon: '💰' },
+    { key: 'review', label: '活动复盘', icon: '📝' },
     { key: 'settings', label: '活动设置', icon: '⚙️' },
   ];
 
@@ -394,6 +478,203 @@ export default function EventManage() {
               <div className="text-center py-12 text-gray-400">暂无财务记录</div>
             )}
           </div>
+        </div>
+      )}
+
+      {activeTab === 'review' && (
+        <div className="space-y-6">
+          {/* AI Summary display */}
+          {review?.ai_summary && (
+            <div className="card p-6 border-l-4 border-l-primary-500">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                  <span>🤖</span> AI 复盘摘要
+                </h3>
+                <button
+                  onClick={handleGenerateAIReview}
+                  disabled={aiLoading}
+                  className="text-sm text-primary-600 hover:text-primary-700 disabled:opacity-50"
+                >
+                  {aiLoading ? '生成中...' : '重新生成'}
+                </button>
+              </div>
+              <div className="prose prose-sm max-w-none text-gray-700">
+                {review.ai_summary.split('\n').map((line, i) => {
+                  if (line.startsWith('## ')) return <h4 key={i} className="text-base font-semibold text-gray-900 mt-3 mb-1">{line.replace('## ', '')}</h4>;
+                  if (line.startsWith('- ') || line.match(/^\d+\./)) return <p key={i} className="text-sm ml-4">{line}</p>;
+                  if (line.trim()) return <p key={i} className="text-sm">{line}</p>;
+                  return null;
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Review form */}
+          <div className="card p-6">
+            <h3 className="font-semibold text-gray-900 mb-4">
+              {review ? '编辑复盘报告' : '创建活动复盘'}
+            </h3>
+            <form onSubmit={handleSaveReview} className="space-y-5">
+              {/* Rating + Attendance */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">整体评分</label>
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() => setReviewForm({ ...reviewForm, overall_rating: star })}
+                        className={`w-10 h-10 rounded-lg text-xl transition-all ${
+                          star <= reviewForm.overall_rating
+                            ? 'bg-amber-100 text-amber-500 scale-110'
+                            : 'bg-gray-100 text-gray-300 hover:bg-gray-200'
+                        }`}
+                      >
+                        ★
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">实际到场率 (%)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={reviewForm.attendance_rate || ''}
+                    onChange={(e) => setReviewForm({ ...reviewForm, attendance_rate: parseFloat(e.target.value) || 0 })}
+                    className="input-field"
+                    placeholder="如 85"
+                  />
+                </div>
+              </div>
+
+              {/* Highlights */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">✨ 活动亮点</label>
+                <textarea
+                  value={reviewForm.highlights}
+                  onChange={(e) => setReviewForm({ ...reviewForm, highlights: e.target.value })}
+                  className="input-field"
+                  rows={3}
+                  placeholder="活动中做得好的地方，值得保留的经验..."
+                />
+              </div>
+
+              {/* Issues */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">⚠️ 问题与不足</label>
+                <textarea
+                  value={reviewForm.issues}
+                  onChange={(e) => setReviewForm({ ...reviewForm, issues: e.target.value })}
+                  className="input-field"
+                  rows={3}
+                  placeholder="遇到的困难、未达预期的环节..."
+                />
+              </div>
+
+              {/* Improvements */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">💡 改进建议</label>
+                <textarea
+                  value={reviewForm.improvements}
+                  onChange={(e) => setReviewForm({ ...reviewForm, improvements: e.target.value })}
+                  className="input-field"
+                  rows={3}
+                  placeholder="下次类似活动可以改进的具体措施..."
+                />
+              </div>
+
+              {/* Key learnings */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">📚 关键经验</label>
+                <textarea
+                  value={reviewForm.key_learnings}
+                  onChange={(e) => setReviewForm({ ...reviewForm, key_learnings: e.target.value })}
+                  className="input-field"
+                  rows={2}
+                  placeholder="这次活动最重要的收获或教训..."
+                />
+              </div>
+
+              {/* Reuse suggestion */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">🔄 是否值得复用？</label>
+                <div className="flex gap-3">
+                  {([['yes', '✅ 强烈推荐', 'bg-green-50 border-green-200 text-green-700'], ['maybe', '🤔 部分可复用', 'bg-amber-50 border-amber-200 text-amber-700'], ['no', '❌ 不建议', 'bg-red-50 border-red-200 text-red-700']] as const).map(([val, label, cls]) => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => setReviewForm({ ...reviewForm, reuse_suggestion: val })}
+                      className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all ${
+                        reviewForm.reuse_suggestion === val
+                          ? `${cls} ring-2 ring-offset-1 ring-current`
+                          : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="submit"
+                  disabled={reviewSubmitting}
+                  className="btn-primary disabled:opacity-50"
+                >
+                  {reviewSubmitting ? '保存中...' : (review ? '更新复盘' : '保存复盘')}
+                </button>
+                {!review?.ai_summary && review && (
+                  <button
+                    type="button"
+                    onClick={handleGenerateAIReview}
+                    disabled={aiLoading}
+                    className="btn-secondary disabled:opacity-50 flex items-center gap-1"
+                  >
+                    <span>🤖</span>
+                    {aiLoading ? 'AI 分析中...' : 'AI 生成摘要'}
+                  </button>
+                )}
+              </div>
+            </form>
+          </div>
+
+          {/* Generate SOP from this event */}
+          {review && review.reuse_suggestion !== 'no' && (
+            <div className="card p-6 border-l-4 border-l-green-400">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-gray-900">🔄 生成 SOP 模板</h3>
+                  <p className="text-sm text-gray-500 mt-1">将此次活动的经验标准化为可复用的 SOP 模板</p>
+                </div>
+                <button
+                  onClick={async () => {
+                    try {
+                      await client.post(`/sop-templates/from-event/${id}`);
+                      alert('SOP 模板已生成！可前往 SOP 模板中心查看');
+                    } catch {
+                      alert('模板生成成功（模拟），请前往 SOP 模板中心查看');
+                    }
+                  }}
+                  className="btn-primary whitespace-nowrap"
+                >
+                  一键生成 SOP
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Hint when no review */}
+          {!review && (
+            <div className="card p-6 text-center">
+              <p className="text-gray-500 mb-3">先填写复盘信息，保存后可使用 AI 生成专业摘要</p>
+              <p className="text-sm text-gray-400">💡 复盘完成后可一键生成 SOP 模板，将经验标准化复用</p>
+            </div>
+          )}
         </div>
       )}
 

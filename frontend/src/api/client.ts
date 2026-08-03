@@ -73,6 +73,13 @@ import type {
   SearchResult,
   SearchParams,
   UploadResponse,
+  Review,
+  ReviewCreateRequest,
+  ReviewListResponse,
+  SOPTemplate,
+  SOPTemplateCreateRequest,
+  SOPTemplateListResponse,
+  FinanceSummaryData,
 } from '../types';
 
 /** 获取当前用户画像 */
@@ -135,6 +142,90 @@ export async function searchEvents(params: SearchParams): Promise<SearchResult> 
 export async function getRecommendations(): Promise<Recommendation[]> {
   const res = await client.get<{ total: number; items: Recommendation[]; strategy: string }>('/events/recommendations');
   return res.data.items || [];
+}
+
+// ===== Phase 2: Review & SOP Template API =====
+
+/** 获取活动复盘报告 */
+export async function getReview(eventId: number): Promise<Review> {
+  const res = await client.get<Review>(`/reviews/events/${eventId}/review`);
+  return res.data;
+}
+
+/** 创建活动复盘报告 */
+export async function createReview(eventId: number, data: ReviewCreateRequest): Promise<Review> {
+  const res = await client.post<Review>(`/reviews/events/${eventId}/review`, data);
+  return res.data;
+}
+
+/** 更新活动复盘报告 */
+export async function updateReview(eventId: number, data: Partial<ReviewCreateRequest>): Promise<Review> {
+  const res = await client.put<Review>(`/reviews/events/${eventId}/review`, data);
+  return res.data;
+}
+
+/** AI 生成复盘摘要 */
+export async function generateAIReviewSummary(eventId: number): Promise<Review> {
+  const res = await client.post<Review>(`/reviews/events/${eventId}/review/ai-summary`);
+  return res.data;
+}
+
+/** 获取我的复盘列表 */
+export async function getMyReviews(): Promise<ReviewListResponse> {
+  const res = await client.get<ReviewListResponse>('/reviews/my/reviews');
+  return res.data;
+}
+
+/** 获取 SOP 模板列表 */
+export async function getSOPTemplates(params?: {
+  page?: number;
+  page_size?: number;
+  category?: string;
+  keyword?: string;
+}): Promise<SOPTemplateListResponse> {
+  const res = await client.get<SOPTemplateListResponse>('/sop-templates', { params });
+  return res.data;
+}
+
+/** 获取单个 SOP 模板 */
+export async function getSOPTemplate(templateId: number): Promise<SOPTemplate> {
+  const res = await client.get<SOPTemplate>(`/sop-templates/${templateId}`);
+  return res.data;
+}
+
+/** 创建 SOP 模板 */
+export async function createSOPTemplate(data: SOPTemplateCreateRequest): Promise<SOPTemplate> {
+  const res = await client.post<SOPTemplate>('/sop-templates', data);
+  return res.data;
+}
+
+/** 更新 SOP 模板 */
+export async function updateSOPTemplate(templateId: number, data: Partial<SOPTemplateCreateRequest>): Promise<SOPTemplate> {
+  const res = await client.put<SOPTemplate>(`/sop-templates/${templateId}`, data);
+  return res.data;
+}
+
+/** 删除 SOP 模板 */
+export async function deleteSOPTemplate(templateId: number): Promise<void> {
+  await client.delete(`/sop-templates/${templateId}`);
+}
+
+/** 从活动生成 SOP 模板 */
+export async function createSOPTemplateFromEvent(eventId: number): Promise<SOPTemplate> {
+  const res = await client.post<SOPTemplate>(`/sop-templates/from-event/${eventId}`);
+  return res.data;
+}
+
+/** 标记使用 SOP 模板 */
+export async function useSOPTemplate(templateId: number): Promise<SOPTemplate> {
+  const res = await client.post<SOPTemplate>(`/sop-templates/${templateId}/use`);
+  return res.data;
+}
+
+/** 获取活动财务汇总 */
+export async function getFinanceSummary(eventId: number): Promise<FinanceSummaryData> {
+  const res = await client.get<FinanceSummaryData>(`/events/${eventId}/finance/summary`);
+  return res.data;
 }
 
 export { client as default };

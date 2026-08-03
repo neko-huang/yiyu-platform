@@ -17,6 +17,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const PublicProfilePage = lazy(() => import('./pages/PublicProfilePage'));
 const SearchPage = lazy(() => import('./pages/SearchPage'));
+const SOPPage = lazy(() => import('./pages/SOPPage'));
 
 /** 全局加载占位符 */
 function PageLoading() {
@@ -55,6 +56,7 @@ function App() {
         <Route path="/events/:id/manage" element={<Suspense fallback={<PageLoading />}><EventManage /></Suspense>} />
         <Route path="/map" element={<Suspense fallback={<PageLoading />}><MapPage /></Suspense>} />
         <Route path="/ai-plan" element={<Suspense fallback={<PageLoading />}><AIPlan /></Suspense>} />
+        <Route path="/sop" element={<Suspense fallback={<PageLoading />}><SOPPage /></Suspense>} />
         <Route path="/profile" element={<Suspense fallback={<PageLoading />}><ProfilePage /></Suspense>} />
 
         {/* 管理端路由 */}
