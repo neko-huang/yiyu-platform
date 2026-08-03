@@ -1,15 +1,6 @@
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import { useEffect, useRef } from 'react';
+import AMapLoader from '@amap/amap-jsapi-loader';
 import type { Event } from '../types';
-
-// 修复 Leaflet 默认图标问题
-delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-});
 
 interface MapViewProps {
   events?: Event[];
@@ -21,72 +12,122 @@ interface MapViewProps {
   interactive?: boolean;
 }
 
-/** 子组件：通过 useMapEvents 监听地图点击事件 */
-function ClickHandler({ onMapClick }: { onMapClick: (lat: number, lng: number) => void }) {
-  useMapEvents({
-    click: (e) => {
-      onMapClick(e.latlng.lat, e.latlng.lng);
-    },
-  });
-  return null;
-}
-
 export default function MapView({
   events = [],
-  center = [35.86166, 104.195397], // 中国中心点
+  center = [35.86166, 104.195397],
   zoom = 4,
   height = '400px',
   singleMarker,
   onMapClick,
   interactive = false,
 }: MapViewProps) {
-  return (
-    <div style={{ height }} className="rounded-xl overflow-hidden border border-gray-200">
-      <MapContainer
-        center={center as [number, number]}
-        zoom={zoom}
-        style={{ width: '100%', height: '100%' }}
-        scrollWheelZoom={interactive}
-      >
-        <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        />
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<any>(null);
+  const markersRef = useRef<any[]>([]);
 
-        {/* 地图点击事件处理（仅在交互模式下） */}
-        {onMapClick && <ClickHandler onMapClick={onMapClick} />}
+  useEffect(() => {
+    if (!mapRef.current) return;
 
-        {/* Single marker mode (for event detail / create event) */}
-        {singleMarker && (
-          <Marker position={[singleMarker.lat, singleMarker.lng]}>
-            <Popup>{singleMarker.title}</Popup>
-          </Marker>
-        )}
+    let disposed = false;
 
-        {/* Multiple markers mode (for map page) */}
-        {events.map((event) => (
-          <Marker
-            key={event.id}
-            position={[event.latitude, event.longitude]}
-          >
-            <Popup>
-              <div className="min-w-[180px]">
-                <h3 className="font-semibold text-gray-900 mb-1">{event.title}</h3>
-                <p className="text-sm text-gray-600 mb-1">📍 {event.location_name}</p>
-                <p className="text-sm text-gray-600 mb-2">
-                  {new Date(event.start_time).toLocaleString('zh-CN')}
-                </p>
-                <a
-                  href={`/events/${event.id}`}
-                  className="text-primary-600 text-sm font-medium hover:underline"
-                >
-                  查看详情 →
-                </a>
+    AMapLoader.load({
+      key: import.meta.env.VITE_AMAP_KEY || '',
+      version: '2.0',
+      plugins: ['AMap.Marker', 'AMap.InfoWindow'],
+    }).then((AMap) => {
+      if (disposed || !mapRef.current) return;
+
+      const map = new AMap.Map(mapRef.current, {
+        zoom,
+        center: [center[1], center[0]], // AMap uses [lng, lat]
+        viewMode: '2D',
+        mapStyle: 'amap://styles/normal',
+      });
+
+      mapInstanceRef.current = map;
+
+      // Add markers for events (multi-marker mode)
+      if (events.length > 0) {
+        const markers = events
+          .filter((e) => e.latitude && e.longitude)
+          .map((event) => {
+            const marker = new AMap.Marker({
+              position: new AMap.LngLat(event.longitude, event.latitude),
+              title: event.title,
+              extData: event,
+            });
+
+            const infoContent = `
+              <div style="padding:4px 0;min-width:200px;font-family:system-ui,sans-serif;">
+                <h3 style="font-weight:600;font-size:14px;margin:0 0 4px;color:#111;">${event.title}</h3>
+                <p style="font-size:12px;color:#666;margin:0 0 4px;">📍 ${event.location_name || ''}</p>
+                <p style="font-size:12px;color:#666;margin:0 0 8px;">${new Date(event.start_time).toLocaleString('zh-CN')}</p>
+                <a href="/events/${event.id}" style="font-size:12px;color:#2563eb;text-decoration:none;font-weight:500;">查看详情 →</a>
               </div>
-            </Popup>
-          </Marker>
-        ))}
-      </MapContainer>
-    </div>
+            `;
+
+            const infoWindow = new AMap.InfoWindow({
+              content: infoContent,
+              offset: new AMap.Pixel(0, -30),
+              closeWhenClickMap: true,
+            });
+
+            marker.on('click', () => {
+              infoWindow.open(map, marker.getPosition());
+            });
+
+            return marker;
+          });
+
+        map.add(markers);
+        markersRef.current = markers;
+
+        // Auto-fit to show all markers
+        if (markers.length > 0) {
+          map.setFitView(markers, false, [60, 60, 60, 60]);
+        }
+      }
+
+      // Single marker mode (event detail / create event)
+      if (singleMarker && singleMarker.lat && singleMarker.lng) {
+        const marker = new AMap.Marker({
+          position: new AMap.LngLat(singleMarker.lng, singleMarker.lat),
+          title: singleMarker.title,
+        });
+        map.add(marker);
+        markersRef.current = [marker];
+      }
+
+      // Map click handler (interactive mode for creating events)
+      if (onMapClick) {
+        map.on('click', (e: any) => {
+          onMapClick(e.lnglat.getLat(), e.lnglat.getLng());
+        });
+      }
+
+      // Enable scroll zoom in interactive mode
+      if (interactive) {
+        map.setStatus({ scrollWheel: true });
+      }
+    }).catch((err: Error) => {
+      console.error('Failed to load AMap:', err);
+    });
+
+    return () => {
+      disposed = true;
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.destroy();
+        mapInstanceRef.current = null;
+      }
+      markersRef.current = [];
+    };
+  }, [events, singleMarker, center, zoom, onMapClick, interactive]);
+
+  return (
+    <div
+      ref={mapRef}
+      className="rounded-xl overflow-hidden border border-gray-200"
+      style={{ width: '100%', height }}
+    />
   );
 }
