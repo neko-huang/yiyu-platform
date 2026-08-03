@@ -181,7 +181,7 @@ export default function Home() {
       // fallback — 构造模拟推荐
       setRecommendations(
         mockEvents.slice(0, 4).map((event, i) => ({
-          event,
+          ...event,
           match_reasons:
             i === 0
               ? ['基于你的兴趣: 户外', '同城市热门活动']
@@ -190,6 +190,7 @@ export default function Home() {
                 : i === 2
                   ? ['好友也在参与']
                   : ['近期热门'],
+          match_score: 0,
         })),
       );
     } finally {
@@ -231,7 +232,7 @@ export default function Home() {
           </div>
           <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 snap-x snap-mandatory scrollbar-thin">
             {recommendations.map((rec) => (
-              <RecommendationCard key={rec.event.id} recommendation={rec} />
+              <RecommendationCard key={rec.id} recommendation={rec} />
             ))}
           </div>
         </section>
@@ -372,42 +373,42 @@ export default function Home() {
 
 /** 推荐活动卡片（横向滚动，带匹配原因） */
 function RecommendationCard({ recommendation }: { recommendation: Recommendation }) {
-  const { event, match_reasons } = recommendation;
+  const { id, title, category, type, cover_image, price, start_time, location_name, current_participants, max_participants, match_reasons } = recommendation;
   return (
     <Link
-      to={`/events/${event.id}`}
+      to={`/events/${id}`}
       className="card overflow-hidden hover:shadow-lg transition-shadow duration-200 group flex-shrink-0 w-72 snap-start"
-      aria-label={`推荐活动：${event.title}`}
+      aria-label={`推荐活动：${title}`}
     >
       {/* Cover */}
       <div className="h-32 bg-gradient-to-br from-primary-400 to-primary-700 relative overflow-hidden">
-        {event.cover_image ? (
+        {cover_image ? (
           <img
-            src={event.cover_image}
-            alt={event.title}
+            src={cover_image}
+            alt={title}
             loading="lazy"
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <span className="text-white text-3xl font-bold opacity-50">{event.category}</span>
+            <span className="text-white text-3xl font-bold opacity-50">{category}</span>
           </div>
         )}
         <span className="absolute top-2 left-2 tag bg-white/90 text-gray-700 backdrop-blur-sm">
-          {getEventTypeLabel(event.type)}
+          {getEventTypeLabel(type)}
         </span>
         <span className="absolute top-2 right-2 tag bg-white/90 text-gray-800 backdrop-blur-sm font-semibold">
-          {event.price === 0 ? '免费' : `¥${event.price}`}
+          {price === 0 ? '免费' : `¥${price}`}
         </span>
       </div>
 
       {/* Content */}
       <div className="p-4">
         <h3 className="font-semibold text-gray-900 mb-1 line-clamp-1 group-hover:text-primary-600 transition-colors">
-          {event.title}
+          {title}
         </h3>
         <p className="text-xs text-gray-400 mb-2">
-          📅 {formatDate(event.start_time)} · 📍 {event.location_name}
+          📅 {formatDate(start_time)} · 📍 {location_name}
         </p>
 
         {/* 匹配原因标签 */}
@@ -426,7 +427,7 @@ function RecommendationCard({ recommendation }: { recommendation: Recommendation
 
         {/* 参与人数 */}
         <div className="flex items-center justify-between text-xs text-gray-400">
-          <span>👥 {event.current_participants}/{event.max_participants}</span>
+          <span>👥 {current_participants}/{max_participants}</span>
           <span className="text-primary-500 group-hover:translate-x-1 transition-transform">查看 →</span>
         </div>
       </div>

@@ -129,9 +129,9 @@ export interface UpdateProfileRequest {
 }
 
 /** 推荐活动（带匹配原因） */
-export interface Recommendation {
-  event: Event;
+export interface Recommendation extends Event {
   match_reasons: string[];
+  match_score: number;
 }
 
 /** 搜索参数 */

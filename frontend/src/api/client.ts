@@ -135,8 +135,8 @@ export async function searchEvents(params: SearchParams): Promise<SearchResult> 
 
 /** 获取推荐活动 */
 export async function getRecommendations(): Promise<Recommendation[]> {
-  const res = await client.get<Recommendation[]>('/events/recommendations');
-  return res.data;
+  const res = await client.get<{ total: number; items: Recommendation[]; strategy: string }>('/events/recommendations');
+  return res.data.items;
 }
 
 export { client as default };
