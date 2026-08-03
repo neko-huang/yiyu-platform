@@ -28,7 +28,7 @@ export function getErrorMessage(err: unknown, fallback: string): string {
         return data.message;
       }
       // 500 等服务器错误
-      const status = axiosErr.response.status;
+      const status = axiosErr.response?.status;
       if (status === 500) return '服务器内部错误，请稍后重试';
       if (status === 502 || status === 503) return '服务暂时不可用，请稍后重试';
       if (status === 409) return '用户名或邮箱已被注册';

@@ -2,6 +2,7 @@ import { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // 路由级懒加载，减少首屏包体积
 const Login = lazy(() => import('./pages/Login'));
@@ -28,6 +29,7 @@ function PageLoading() {
 
 function App() {
   return (
+    <ErrorBoundary>
     <Routes>
       {/* 公开路由（无 Layout） */}
       <Route path="/login" element={<Suspense fallback={<PageLoading />}><Login /></Suspense>} />
@@ -69,6 +71,7 @@ function App() {
       {/* 兜底 */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </ErrorBoundary>
   );
 }
 

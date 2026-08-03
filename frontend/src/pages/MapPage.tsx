@@ -26,7 +26,7 @@ export default function MapPage() {
     setLoading(true);
     try {
       const res = await client.get('/events', { params: { status: 'published' } });
-      setEvents(res.data);
+      setEvents(res.data.items);
     } catch {
       // 后端未启动，使用模拟数据
       setEvents(mockEvents);

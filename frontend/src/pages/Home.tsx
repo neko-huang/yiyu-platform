@@ -138,11 +138,11 @@ export default function Home() {
     try {
       const res = await client.get('/events', {
         params: {
-          search: searchQuery || undefined,
+          keyword: searchQuery || undefined,
           category: selectedCategory !== '全部' ? selectedCategory : undefined,
         },
       });
-      setEvents(res.data);
+      setEvents(res.data.items);
       setUsingMockData(false);
     } catch {
       // 后端未启动，使用模拟数据
@@ -412,7 +412,7 @@ function RecommendationCard({ recommendation }: { recommendation: Recommendation
         </p>
 
         {/* 匹配原因标签 */}
-        {match_reasons.length > 0 && (
+        {match_reasons && match_reasons.length > 0 && (
           <div className="flex flex-wrap gap-1 mb-2">
             {match_reasons.map((reason, idx) => (
               <span

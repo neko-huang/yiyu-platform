@@ -236,7 +236,7 @@ export default function EventDetail() {
           </div>
 
           {/* Tags */}
-          {event.tags.length > 0 && (
+          {event.tags && event.tags.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {event.tags.map((tag) => (
                 <span key={tag} className="tag bg-gray-100 text-gray-600">#{tag}</span>

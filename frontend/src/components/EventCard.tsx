@@ -91,7 +91,7 @@ function EventCardBase({ event }: EventCardProps) {
         </div>
 
         {/* Tags */}
-        {event.tags.length > 0 && (
+        {event.tags && event.tags.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {event.tags.slice(0, 3).map((tag) => (
               <span key={tag} className="tag bg-gray-100 text-gray-600">

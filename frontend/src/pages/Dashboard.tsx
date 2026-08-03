@@ -44,7 +44,7 @@ export default function Dashboard() {
         client.get('/events', { params: { limit: 5 } }),
       ]);
       setStats(statsRes.data);
-      setRecentEvents(eventsRes.data);
+      setRecentEvents(eventsRes.data.items);
     } catch {
       setStats(mockStats);
       setRecentEvents(mockRecentEvents);
