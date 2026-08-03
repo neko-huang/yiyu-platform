@@ -262,3 +262,113 @@ services:
 - 服务异常即时告警
 - 性能指标阈值告警
 - 业务指标异常告警
+
+
+## 6. 补充模块设计
+
+### 6.1 游戏化模块架构
+
+```
+┌─────────────────────────────────────────┐
+│           游戏化模块                      │
+├──────────┬──────────┬───────────────────┤
+│  积分系统  │  徽章系统 │    排行榜         │
+│          │          │                   │
+│ - 活动积分 │ - 成就解锁│ - 活动排行        │
+│ - 打卡积分 │ - 等级徽章│ - 用户排行        │
+│ - 任务积分 │ - 限定徽章│ - 积分排行        │
+└──────────┴──────────┴───────────────────┘
+```
+
+### 6.2 奖励系统架构
+
+```
+用户行为 → 积分计算 → 奖励发放 → 权益兑换
+   │           │           │           │
+   ▼           ▼           ▼           ▼
+签到/参与   积分记录    积分+徽章    优惠券/权益
+组织活动   积分规则    通知推送    优先报名
+连续打卡   积分过期    商城兑换    限定活动
+```
+
+### 6.3 社交资产数据模型
+
+```sql
+-- 用户社交资产表
+CREATE TABLE user_assets (
+  id UUID PRIMARY KEY,
+  user_id UUID REFERENCES users(id),
+  points INT DEFAULT 0,           -- 积分
+  level INT DEFAULT 1,            -- 等级
+  badges JSONB DEFAULT '[]',      -- 徽章列表
+  events_organized INT DEFAULT 0, -- 组织活动数
+  events_joined INT DEFAULT 0,    -- 参与活动数
+  followers_count INT DEFAULT 0,  -- 粉丝数
+  following_count INT DEFAULT 0,  -- 关注数
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- 积分流水表
+CREATE TABLE point_transactions (
+  id UUID PRIMARY KEY,
+  user_id UUID REFERENCES users(id),
+  points INT NOT NULL,            -- 积分变动（正数增加，负数减少）
+  type VARCHAR(50),               -- join_event/organize/checkin/exchange
+  description VARCHAR(500),
+  related_event_id UUID,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- 徽章表
+CREATE TABLE badges (
+  id UUID PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  description TEXT,
+  icon_url VARCHAR(500),
+  condition_type VARCHAR(50),     -- events_joined/events_organized/points/...
+  condition_value INT,
+  is_limited BOOLEAN DEFAULT FALSE
+);
+
+-- 用户徽章关系表
+CREATE TABLE user_badges (
+  id UUID PRIMARY KEY,
+  user_id UUID REFERENCES users(id),
+  badge_id UUID REFERENCES badges(id),
+  earned_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(user_id, badge_id)
+);
+```
+
+### 6.4 社区与推荐模块增强
+
+```
+用户画像（兴趣+行为+位置）
+        ↓
+┌─────────────────────────────────────┐
+│         推荐引擎增强                  │
+├──────────┬──────────┬───────────────┤
+│ 兴趣匹配  │ 地理推荐  │  社交推荐      │
+│          │          │               │
+│ - 活动标签│ - 距离优先│ - 好友参与    │
+│ - 用户标签│ - 同城活动│ - 关注的人    │
+│ - 历史偏好│ - 周边热推│ - 相似用户    │
+└──────────┴──────────┴───────────────┘
+        ↓
+推荐结果（活动列表+活跃用户）
+```
+
+### 6.5 互动功能架构
+
+```
+┌─────────────────────────────────────────┐
+│           活动互动模块                    │
+├──────────┬──────────┬───────────────────┤
+│  实时互动  │  任务系统 │    社交分享        │
+│          │          │                   │
+│ - 弹幕墙  │ - 活动任务│ - 相册分享       │
+│ - 图片直播│ - 任务进度│ - 经历文案       │
+│ - 投票互动│ - 任务奖励│ - 多平台分发     │
+└──────────┴──────────┴───────────────────┘
+```
