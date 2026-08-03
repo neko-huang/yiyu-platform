@@ -129,13 +129,13 @@ export default function Navbar() {
                   {user.avatar_url ? (
                     <img
                       src={user.avatar_url}
-                      alt={user.display_name}
+                      alt={user.display_name || user.username}
                       className="w-8 h-8 rounded-full object-cover"
                     />
                   ) : (
                     <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
                       <span className="text-sm font-medium text-primary-700">
-                        {user.display_name.charAt(0).toUpperCase()}
+                        {(user.display_name || user.username || '?').charAt(0).toUpperCase()}
                       </span>
                     </div>
                   )}
@@ -158,7 +158,7 @@ export default function Navbar() {
                   >
                     {/* 用户信息 */}
                     <div className="px-4 py-2 border-b border-gray-50">
-                      <p className="font-medium text-gray-900 text-sm truncate">{user.display_name}</p>
+                      <p className="font-medium text-gray-900 text-sm truncate">{user.display_name || user.username}</p>
                       <p className="text-xs text-gray-400 truncate">@{user.username}</p>
                     </div>
 

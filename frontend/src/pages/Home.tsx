@@ -142,7 +142,7 @@ export default function Home() {
           category: selectedCategory !== '全部' ? selectedCategory : undefined,
         },
       });
-      setEvents(res.data.items);
+      setEvents(res.data.items || []);
       setUsingMockData(false);
     } catch {
       // 后端未启动，使用模拟数据
@@ -209,10 +209,10 @@ export default function Home() {
 
   // 当前可见的活动列表
   const visibleEvents = useMemo(
-    () => events.slice(0, visibleCount),
+    () => (events || []).slice(0, visibleCount),
     [events, visibleCount],
   );
-  const hasMore = events.length > visibleCount;
+  const hasMore = (events?.length ?? 0) > visibleCount;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

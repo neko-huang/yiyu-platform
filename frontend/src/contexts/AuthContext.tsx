@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { User, LoginRequest, RegisterRequest } from '../types';
 import client from '../api/client';
+import type { AxiosError } from 'axios';
 
 interface AuthContextType {
   user: User | null;
@@ -40,13 +41,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               localStorage.setItem('user', JSON.stringify(res.data));
             }
           })
-          .catch(() => {
+          .catch((err) => {
             if (!isMounted) return;
-            // token 失效，清除
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            setToken(null);
-            setUser(null);
+            const axiosErr = err as AxiosError;
+            // 仅在确认 401（token 失效）时清除，网络错误等其他情况保留缓存用户
+            if (axiosErr.response?.status === 401) {
+              localStorage.removeItem('token');
+              localStorage.removeItem('user');
+              setToken(null);
+              setUser(null);
+            }
+            // 其他错误（网络问题等）保留现有登录态，不踢出用户
           })
           .finally(() => {
             if (isMounted) setLoading(false);
@@ -63,6 +68,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       isMounted = false;
     };
+  }, []);
+
+  // 监听 401 拦截器派发的登出事件（替代 window.location 硬跳转）
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      setToken(null);
+      setUser(null);
+    };
+    window.addEventListener('auth:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
   }, []);
 
   const login = useCallback(async (data: LoginRequest) => {

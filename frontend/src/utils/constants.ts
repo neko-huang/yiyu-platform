@@ -41,8 +41,10 @@ export const eventTypes = [
 ];
 
 /** 格式化日期为 "M月D日 HH:MM" */
-export function formatDate(dateStr: string): string {
+export function formatDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return '待定';
   const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return '待定';
   return `${date.getMonth() + 1}月${date.getDate()}日 ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
 }
 

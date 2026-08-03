@@ -29,14 +29,12 @@ client.interceptors.response.use(
     const status = error.response?.status;
 
     if (status === 401) {
-      // token 失效或未认证 → 清除并跳转登录
+      // token 失效 → 清除本地存储
+      // 不在此处做 window.location 硬跳转，由 AuthContext / ProtectedRoute 通过 React Router 软跳转
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      if (!window.location.pathname.includes('/login')) {
-        // 保存当前位置以便登录后跳回
-        sessionStorage.setItem('redirectAfterLogin', window.location.pathname);
-        window.location.href = '/login';
-      }
+      // 派发自定义事件，通知 AuthContext 更新状态
+      window.dispatchEvent(new CustomEvent('auth:unauthorized'));
     }
     // 403 由各页面自行处理（显示权限提示），不在这里强制跳转
 
@@ -136,7 +134,7 @@ export async function searchEvents(params: SearchParams): Promise<SearchResult> 
 /** 获取推荐活动 */
 export async function getRecommendations(): Promise<Recommendation[]> {
   const res = await client.get<{ total: number; items: Recommendation[]; strategy: string }>('/events/recommendations');
-  return res.data.items;
+  return res.data.items || [];
 }
 
 export { client as default };
