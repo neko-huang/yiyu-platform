@@ -1,0 +1,35 @@
+"""AI 方案相关 Schema"""
+
+from datetime import datetime
+from typing import Literal
+
+from pydantic import BaseModel, Field
+
+
+class AIPlanGenerateRequest(BaseModel):
+    idea: str = Field(..., min_length=1, description="用户想法描述")
+    mode: Literal["direct", "guided"] = "direct"
+
+
+class AIPlanGenerateResponse(BaseModel):
+    content: str = Field(..., description="生成的方案 Markdown 文本")
+
+
+class AIPlanSaveRequest(BaseModel):
+    title: str | None = None
+    content: str
+    conversation_history: list[dict] = Field(default_factory=list)
+
+
+class AIPlanOut(BaseModel):
+    id: int
+    user_id: int
+    title: str | None = None
+    content: str | None = None
+    conversation_history: list = []
+    status: str = "draft"
+    event_id: int | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+    model_config = {"from_attributes": True}

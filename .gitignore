@@ -33,3 +33,8 @@ logs/
 coverage/
 htmlcov/
 .coverage
+node_modules/
+dist/
+backend/__pycache__/
+backend/data/*.db
+**/__pycache__/
