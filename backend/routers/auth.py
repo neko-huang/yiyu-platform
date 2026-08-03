@@ -2,13 +2,15 @@
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from config import logger
 from database import get_db
 from models import User
+from routers.dependencies import get_current_user
 from schemas.user import Token, UserLogin, UserOut, UserRegister, UserUpdate
 from services.auth import create_access_token, hash_password, verify_password
-from routers.dependencies import get_current_user
 
 router = APIRouter(prefix="/auth", tags=["认证"])
 
@@ -36,8 +38,16 @@ async def register(payload: UserRegister, db: AsyncSession = Depends(get_db)):
         tags=[],
     )
     db.add(user)
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="用户名或邮箱已存在",
+        )
     await db.refresh(user)
+    logger.info("新用户注册: %s (id=%s)", user.username, user.id)
     return UserOut.model_validate(user)
 
 
@@ -56,6 +66,7 @@ async def login(payload: UserLogin, db: AsyncSession = Depends(get_db)):
         )
 
     token = create_access_token({"sub": str(user.id), "role": user.role})
+    logger.info("用户登录: %s (id=%s)", user.username, user.id)
     return Token(
         access_token=token,
         token_type="bearer",

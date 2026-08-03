@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import client from '../api/client';
-import type { Event } from '../types';
+import type { Event, Registration } from '../types';
+import { filterTruthy } from '../utils/constants';
 
 type Tab = 'info' | 'events' | 'tags';
 
@@ -44,7 +45,7 @@ export default function Profile() {
       setOrganizedEvents(orgRes.data);
       // joinedRes may return registrations, extract events
       const joined = Array.isArray(joinedRes.data)
-        ? joinedRes.data.map((r: { event?: Event; event_id: number }) => r.event).filter(Boolean)
+        ? filterTruthy(joinedRes.data.map((r: Registration & { event?: Event }) => r.event))
         : [];
       setJoinedEvents(joined);
     } catch {
@@ -68,6 +69,7 @@ export default function Profile() {
 
   const handleSaveProfile = async (e: FormEvent) => {
     e.preventDefault();
+    if (saving) return; // 防重复提交
     setSaving(true);
     try {
       const res = await client.put('/users/me', editForm);
@@ -91,6 +93,19 @@ export default function Profile() {
         ? prev.tags.filter((t) => t !== tag)
         : [...prev.tags, tag],
     }));
+  };
+
+  const handleSaveTags = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const res = await client.put('/users/me', { tags: editForm.tags });
+      updateUser(res.data);
+    } catch {
+      if (user) updateUser({ ...user, tags: editForm.tags });
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (!user) return null;
@@ -135,18 +150,20 @@ export default function Profile() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 border-b border-gray-200">
+      <div className="flex gap-1 mb-6 border-b border-gray-200" role="tablist">
         {tabs.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
+            role="tab"
+            aria-selected={activeTab === tab.key}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
               activeTab === tab.key
                 ? 'border-primary-500 text-primary-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
-            <span className="mr-1.5">{tab.icon}</span>
+            <span className="mr-1.5" aria-hidden="true">{tab.icon}</span>
             {tab.label}
           </button>
         ))}
@@ -158,8 +175,9 @@ export default function Profile() {
           {editing ? (
             <form onSubmit={handleSaveProfile} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">显示名称</label>
+                <label htmlFor="profile-display-name" className="block text-sm font-medium text-gray-700 mb-1.5">显示名称</label>
                 <input
+                  id="profile-display-name"
                   type="text"
                   value={editForm.display_name}
                   onChange={(e) => setEditForm({ ...editForm, display_name: e.target.value })}
@@ -168,8 +186,9 @@ export default function Profile() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">邮箱</label>
+                <label htmlFor="profile-email" className="block text-sm font-medium text-gray-700 mb-1.5">邮箱</label>
                 <input
+                  id="profile-email"
                   type="email"
                   value={editForm.email}
                   onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
@@ -178,8 +197,9 @@ export default function Profile() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">用户名</label>
+                <label htmlFor="profile-username" className="block text-sm font-medium text-gray-700 mb-1.5">用户名</label>
                 <input
+                  id="profile-username"
                   type="text"
                   value={user.username}
                   className="input-field bg-gray-50"
@@ -305,13 +325,14 @@ export default function Profile() {
         <div className="card p-6">
           <h2 className="font-semibold text-gray-900 mb-2">管理兴趣标签</h2>
           <p className="text-sm text-gray-500 mb-4">选择你感兴趣的标签，我们会为你推荐相关活动</p>
-          <div className="flex flex-wrap gap-2 mb-6">
+          <div className="flex flex-wrap gap-2 mb-6" role="group" aria-label="兴趣标签选择">
             {availableTags.map((tag) => {
               const selected = editForm.tags.includes(tag);
               return (
                 <button
                   key={tag}
                   onClick={() => toggleTag(tag)}
+                  aria-pressed={selected}
                   className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
                     selected
                       ? 'bg-primary-500 text-white shadow-md'
@@ -334,6 +355,7 @@ export default function Profile() {
                   <button
                     onClick={() => toggleTag(tag)}
                     className="text-primary-400 hover:text-primary-600"
+                    aria-label={`移除标签 ${tag}`}
                   >
                     ×
                   </button>
@@ -347,17 +369,7 @@ export default function Profile() {
 
           <div className="mt-6 flex gap-3">
             <button
-              onClick={async () => {
-                setSaving(true);
-                try {
-                  const res = await client.put('/users/me', { tags: editForm.tags });
-                  updateUser(res.data);
-                } catch {
-                  if (user) updateUser({ ...user, tags: editForm.tags });
-                } finally {
-                  setSaving(false);
-                }
-              }}
+              onClick={handleSaveTags}
               disabled={saving}
               className="btn-primary"
             >

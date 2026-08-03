@@ -2,15 +2,9 @@ import { useState, useEffect, useCallback, FormEvent } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import client from '../api/client';
 import type { Event, Registration, FinanceRecord } from '../types';
+import { statusLabels, eventStatusLabels } from '../utils/constants';
 
 type Tab = 'registrations' | 'finance' | 'settings';
-
-const statusLabels: Record<string, { text: string; color: string }> = {
-  pending: { text: '待审核', color: 'bg-amber-100 text-amber-700' },
-  approved: { text: '已通过', color: 'bg-green-100 text-green-700' },
-  rejected: { text: '已拒绝', color: 'bg-red-100 text-red-700' },
-  checked_in: { text: '已签到', color: 'bg-blue-100 text-blue-700' },
-};
 
 export default function EventManage() {
   const { id } = useParams<{ id: string }>();
@@ -30,6 +24,8 @@ export default function EventManage() {
     amount: 0,
     description: '',
   });
+  const [finSubmitting, setFinSubmitting] = useState(false);
+  const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -84,22 +80,29 @@ export default function EventManage() {
   }, [fetchData]);
 
   const handleRegStatus = async (regId: number, status: Registration['status']) => {
+    const actionKey = `reg-${regId}-${status}`;
+    setActionLoading((prev) => ({ ...prev, [actionKey]: true }));
     try {
       await client.patch(`/registrations/${regId}`, { status });
-      setRegistrations((prev) =>
-        prev.map((r) => (r.id === regId ? { ...r, status } : r)),
-      );
     } catch {
       // 模拟更新
-      setRegistrations((prev) =>
-        prev.map((r) => (r.id === regId ? { ...r, status } : r)),
-      );
     }
+    setRegistrations((prev) =>
+      prev.map((r) => (r.id === regId ? { ...r, status } : r)),
+    );
+    setActionLoading((prev) => {
+      const next = { ...prev };
+      delete next[actionKey];
+      return next;
+    });
   };
 
   const handleAddFinance = async (e: FormEvent) => {
     e.preventDefault();
+    if (finSubmitting) return; // 防重复提交
     if (!finForm.category || finForm.amount <= 0) return;
+
+    setFinSubmitting(true);
 
     const newRecord: FinanceRecord = {
       id: Date.now(),
@@ -113,21 +116,28 @@ export default function EventManage() {
 
     try {
       await client.post(`/events/${id}/finance`, finForm);
-      setFinanceRecords((prev) => [...prev, newRecord]);
     } catch {
-      setFinanceRecords((prev) => [...prev, newRecord]);
+      // 后端未启动 - 模拟添加
     }
-
+    setFinanceRecords((prev) => [...prev, newRecord]);
     setFinForm({ type: 'income', category: '', amount: 0, description: '' });
+    setFinSubmitting(false);
   };
 
   const handleUpdateEventStatus = async (status: string) => {
+    const actionKey = `status-${status}`;
+    setActionLoading((prev) => ({ ...prev, [actionKey]: true }));
     try {
       await client.patch(`/events/${id}`, { status });
-      setEvent((prev) => (prev ? { ...prev, status } : prev));
     } catch {
-      setEvent((prev) => (prev ? { ...prev, status } : prev));
+      // 模拟更新
     }
+    setEvent((prev) => (prev ? { ...prev, status } : prev));
+    setActionLoading((prev) => {
+      const next = { ...prev };
+      delete next[actionKey];
+      return next;
+    });
   };
 
   if (loading) {
@@ -163,29 +173,31 @@ export default function EventManage() {
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
       <div className="mb-6">
-        <div className="text-sm text-gray-500 mb-2">
+        <nav className="text-sm text-gray-500 mb-2" aria-label="面包屑导航">
           <Link to="/" className="hover:text-primary-600">首页</Link>
           <span className="mx-2">/</span>
           <Link to={`/events/${id}`} className="hover:text-primary-600">{event.title}</Link>
           <span className="mx-2">/</span>
           <span className="text-gray-700">管理</span>
-        </div>
+        </nav>
         <h1 className="text-2xl font-bold text-gray-900">活动管理 - {event.title}</h1>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 border-b border-gray-200">
+      <div className="flex gap-1 mb-6 border-b border-gray-200" role="tablist">
         {tabs.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
+            role="tab"
+            aria-selected={activeTab === tab.key}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
               activeTab === tab.key
                 ? 'border-primary-500 text-primary-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
-            <span className="mr-1.5">{tab.icon}</span>
+            <span className="mr-1.5" aria-hidden="true">{tab.icon}</span>
             {tab.label}
           </button>
         ))}
@@ -194,8 +206,8 @@ export default function EventManage() {
       {/* Tab content */}
       {activeTab === 'registrations' && (
         <div>
-          {/* Stats */}
-          <div className="grid grid-cols-4 gap-4 mb-6">
+          {/* Stats - 移动端 2 列，桌面端 4 列 */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
             {(['pending', 'approved', 'checked_in', 'rejected'] as const).map((status) => {
               const count = registrations.filter((r) => r.status === status).length;
               return (
@@ -246,13 +258,15 @@ export default function EventManage() {
                           <>
                             <button
                               onClick={() => handleRegStatus(reg.id, 'approved')}
-                              className="text-xs text-green-600 hover:bg-green-50 px-2 py-1 rounded"
+                              disabled={actionLoading[`reg-${reg.id}-approved`]}
+                              className="text-xs text-green-600 hover:bg-green-50 px-2 py-1 rounded disabled:opacity-50"
                             >
                               通过
                             </button>
                             <button
                               onClick={() => handleRegStatus(reg.id, 'rejected')}
-                              className="text-xs text-red-600 hover:bg-red-50 px-2 py-1 rounded"
+                              disabled={actionLoading[`reg-${reg.id}-rejected`]}
+                              className="text-xs text-red-600 hover:bg-red-50 px-2 py-1 rounded disabled:opacity-50"
                             >
                               拒绝
                             </button>
@@ -261,7 +275,8 @@ export default function EventManage() {
                         {reg.status === 'approved' && (
                           <button
                             onClick={() => handleRegStatus(reg.id, 'checked_in')}
-                            className="text-xs text-blue-600 hover:bg-blue-50 px-2 py-1 rounded"
+                            disabled={actionLoading[`reg-${reg.id}-checked_in`]}
+                            className="text-xs text-blue-600 hover:bg-blue-50 px-2 py-1 rounded disabled:opacity-50"
                           >
                             签到
                           </button>
@@ -305,6 +320,7 @@ export default function EventManage() {
                 value={finForm.type}
                 onChange={(e) => setFinForm({ ...finForm, type: e.target.value as 'income' | 'expense' })}
                 className="input-field"
+                aria-label="收支类型"
               >
                 <option value="income">收入</option>
                 <option value="expense">支出</option>
@@ -315,6 +331,8 @@ export default function EventManage() {
                 onChange={(e) => setFinForm({ ...finForm, category: e.target.value })}
                 className="input-field"
                 placeholder="类别（如报名费、场地费）"
+                aria-label="类别"
+                required
               />
               <input
                 type="number"
@@ -323,6 +341,8 @@ export default function EventManage() {
                 className="input-field"
                 placeholder="金额"
                 min="0"
+                aria-label="金额"
+                required
               />
               <div className="flex gap-2">
                 <input
@@ -331,8 +351,11 @@ export default function EventManage() {
                   onChange={(e) => setFinForm({ ...finForm, description: e.target.value })}
                   className="input-field flex-1"
                   placeholder="备注"
+                  aria-label="备注"
                 />
-                <button type="submit" className="btn-primary whitespace-nowrap">添加</button>
+                <button type="submit" disabled={finSubmitting} className="btn-primary whitespace-nowrap disabled:opacity-50">
+                  {finSubmitting ? '添加中...' : '添加'}
+                </button>
               </div>
             </form>
           </div>
@@ -403,12 +426,8 @@ export default function EventManage() {
               <div>
                 <p className="text-gray-500">状态</p>
                 <p className="font-medium text-gray-900 mt-1">
-                  <span className={`tag ${
-                    event.status === 'published' ? 'bg-green-100 text-green-700' :
-                    event.status === 'draft' ? 'bg-gray-100 text-gray-700' :
-                    'bg-red-100 text-red-700'
-                  }`}>
-                    {event.status === 'published' ? '已发布' : event.status === 'draft' ? '草稿' : event.status === 'ended' ? '已结束' : event.status}
+                  <span className={`tag ${eventStatusLabels[event.status]?.color || 'bg-gray-100 text-gray-700'}`}>
+                    {eventStatusLabels[event.status]?.text || event.status}
                   </span>
                 </p>
               </div>
@@ -420,12 +439,20 @@ export default function EventManage() {
             <h3 className="font-semibold text-gray-900 mb-4">活动状态管理</h3>
             <div className="flex flex-wrap gap-3">
               {event.status !== 'published' && (
-                <button onClick={() => handleUpdateEventStatus('published')} className="btn-primary">
+                <button
+                  onClick={() => handleUpdateEventStatus('published')}
+                  disabled={actionLoading['status-published']}
+                  className="btn-primary disabled:opacity-50"
+                >
                   📢 发布活动
                 </button>
               )}
               {event.status === 'published' && (
-                <button onClick={() => handleUpdateEventStatus('ended')} className="btn-danger">
+                <button
+                  onClick={() => handleUpdateEventStatus('ended')}
+                  disabled={actionLoading['status-ended']}
+                  className="btn-danger disabled:opacity-50"
+                >
                   🔚 结束活动
                 </button>
               )}

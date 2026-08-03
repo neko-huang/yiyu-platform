@@ -20,7 +20,6 @@ const mockEvents: Event[] = [
 export default function MapPage() {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
 
   const fetchEvents = useCallback(async () => {
@@ -29,6 +28,7 @@ export default function MapPage() {
       const res = await client.get('/events', { params: { status: 'published' } });
       setEvents(res.data);
     } catch {
+      // 后端未启动，使用模拟数据
       setEvents(mockEvents);
     } finally {
       setLoading(false);
@@ -58,13 +58,14 @@ export default function MapPage() {
         <div className="flex-1 relative">
           {loading ? (
             <div className="w-full h-full flex items-center justify-center bg-gray-100">
-              <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary-200 border-t-primary-500"></div>
+              <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary-200 border-t-primary-500" role="status" aria-label="加载中"></div>
             </div>
-          ) : error ? (
-            <div className="w-full h-full flex items-center justify-center">
+          ) : events.length === 0 ? (
+            <div className="w-full h-full flex items-center justify-center bg-gray-100">
               <div className="text-center">
-                <p className="text-red-500 mb-4">{error}</p>
-                <button onClick={fetchEvents} className="btn-secondary">重新加载</button>
+                <div className="text-5xl mb-3">🗺️</div>
+                <p className="text-gray-500 mb-4">暂无活动</p>
+                <button onClick={fetchEvents} className="btn-secondary">刷新</button>
               </div>
             </div>
           ) : (
@@ -81,6 +82,7 @@ export default function MapPage() {
                 <button
                   key={event.id}
                   onClick={() => setSelectedEvent(event)}
+                  aria-label={`查看 ${event.title}`}
                   className={`w-full text-left p-3 rounded-lg border transition-all ${
                     selectedEvent?.id === event.id
                       ? 'border-primary-300 bg-primary-50'
@@ -96,7 +98,7 @@ export default function MapPage() {
                     </span>
                   </div>
                   <p className="text-xs text-gray-500 flex items-center gap-1">
-                    <span>📍</span>
+                    <span aria-hidden="true">📍</span>
                     <span className="line-clamp-1">{event.location_name}</span>
                   </p>
                   <p className="text-xs text-gray-400 mt-1">
@@ -117,10 +119,15 @@ export default function MapPage() {
 
       {/* Selected event detail popup (mobile) */}
       {selectedEvent && (
-        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 shadow-lg z-50" onClick={() => setSelectedEvent(null)}>
+        <div
+          className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 shadow-lg z-50"
+          onClick={() => setSelectedEvent(null)}
+          role="dialog"
+          aria-label={selectedEvent.title}
+        >
           <div className="flex items-center justify-between mb-2">
             <h3 className="font-semibold text-gray-900">{selectedEvent.title}</h3>
-            <button className="text-gray-400 text-xl">×</button>
+            <button className="text-gray-400 text-xl" aria-label="关闭" onClick={() => setSelectedEvent(null)}>×</button>
           </div>
           <p className="text-sm text-gray-500">📍 {selectedEvent.location_name}</p>
           <a href={`/events/${selectedEvent.id}`} className="text-primary-600 text-sm font-medium mt-2 inline-block">查看详情 →</a>

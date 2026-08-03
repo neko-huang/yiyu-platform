@@ -1,12 +1,16 @@
 import { useState, FormEvent } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { getErrorMessage } from '../utils/errors';
 
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/';
+  // 优先使用 AuthContext 保存的重定向路径，其次使用 location state
+  const from = (location.state as { from?: { pathname: string } })?.from?.pathname
+    || sessionStorage.getItem('redirectAfterLogin')
+    || '/';
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -16,17 +20,21 @@ export default function Login() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (!username.trim() || !password.trim()) {
+      setError('请输入用户名和密码');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      await login({ username, password });
+      await login({ username: username.trim(), password });
+      // 登录成功后清除重定向路径
+      sessionStorage.removeItem('redirectAfterLogin');
       navigate(from, { replace: true });
     } catch (err: unknown) {
-      const msg =
-        err instanceof Error
-          ? err.message
-          : '登录失败，请检查用户名和密码';
-      setError(msg);
+      setError(getErrorMessage(err, '登录失败，请检查用户名和密码'));
     } finally {
       setLoading(false);
     }
@@ -48,14 +56,15 @@ export default function Login() {
         <div className="card p-8">
           <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg p-3">
+              <div className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg p-3" role="alert">
                 {error}
               </div>
             )}
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">用户名</label>
+              <label htmlFor="login-username" className="block text-sm font-medium text-gray-700 mb-1.5">用户名</label>
               <input
+                id="login-username"
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
@@ -67,8 +76,9 @@ export default function Login() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">密码</label>
+              <label htmlFor="login-password" className="block text-sm font-medium text-gray-700 mb-1.5">密码</label>
               <input
+                id="login-password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

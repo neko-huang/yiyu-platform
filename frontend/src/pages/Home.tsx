@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import EventCard from '../components/EventCard';
 import client from '../api/client';
 import type { Event } from '../types';
+import { categories } from '../utils/constants';
 
 // 模拟数据 - 后端未启动时使用
 const mockEvents: Event[] = [
@@ -116,14 +117,16 @@ const mockEvents: Event[] = [
   },
 ];
 
-const categories = ['全部', '户外', '音乐', '读书', '运动', '讲座', '科技', '美食', '艺术'];
+const PAGE_SIZE = 9;
 
 export default function Home() {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [usingMockData, setUsingMockData] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('全部');
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const fetchEvents = useCallback(async () => {
     setLoading(true);
@@ -136,9 +139,10 @@ export default function Home() {
         },
       });
       setEvents(res.data);
+      setUsingMockData(false);
     } catch {
       // 后端未启动，使用模拟数据
-      console.log('后端未连接，使用模拟数据');
+      setUsingMockData(true);
       let filtered = [...mockEvents];
       if (selectedCategory !== '全部') {
         filtered = filtered.filter((e) => e.category === selectedCategory);
@@ -159,12 +163,21 @@ export default function Home() {
 
   useEffect(() => {
     fetchEvents();
+    // 切换筛选条件时重置分页
+    setVisibleCount(PAGE_SIZE);
   }, [fetchEvents]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     fetchEvents();
   };
+
+  // 当前可见的活动列表
+  const visibleEvents = useMemo(
+    () => events.slice(0, visibleCount),
+    [events, visibleCount],
+  );
+  const hasMore = events.length > visibleCount;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -183,6 +196,7 @@ export default function Home() {
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
+              aria-hidden="true"
             >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
@@ -192,6 +206,7 @@ export default function Home() {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="input-field pl-10"
               placeholder="搜索活动名称、标签..."
+              aria-label="搜索活动"
             />
           </div>
           <button type="submit" className="btn-primary px-8">
@@ -201,11 +216,12 @@ export default function Home() {
       </form>
 
       {/* Category filters */}
-      <div className="flex flex-wrap gap-2 mb-8">
+      <div className="flex flex-wrap gap-2 mb-8" role="group" aria-label="活动分类筛选">
         {categories.map((cat) => (
           <button
             key={cat}
             onClick={() => setSelectedCategory(cat)}
+            aria-pressed={selectedCategory === cat}
             className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
               selectedCategory === cat
                 ? 'bg-primary-500 text-white shadow-md'
@@ -248,16 +264,32 @@ export default function Home() {
         </div>
       ) : (
         <>
+          {usingMockData && (
+            <div className="mb-4 bg-amber-50 border border-amber-200 text-amber-700 text-sm rounded-lg p-3">
+              ⚠️ 后端服务未连接，当前显示模拟数据。启动后端后即可看到真实数据。
+            </div>
+          )}
           <div className="flex items-center justify-between mb-4">
             <p className="text-sm text-gray-500">
               共找到 <span className="font-medium text-gray-700">{events.length}</span> 个活动
             </p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {events.map((event) => (
+            {visibleEvents.map((event) => (
               <EventCard key={event.id} event={event} />
             ))}
           </div>
+          {/* 加载更多 / 分页 */}
+          {hasMore && (
+            <div className="text-center mt-8">
+              <button
+                onClick={() => setVisibleCount((prev) => prev + PAGE_SIZE)}
+                className="btn-secondary"
+              >
+                加载更多（剩余 {events.length - visibleCount} 个）
+              </button>
+            </div>
+          )}
         </>
       )}
     </div>

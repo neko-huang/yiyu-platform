@@ -1,23 +1,35 @@
+import { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Home from './pages/Home';
-import EventDetail from './pages/EventDetail';
-import CreateEvent from './pages/CreateEvent';
-import EventManage from './pages/EventManage';
-import MapPage from './pages/MapPage';
-import AIPlan from './pages/AIPlan';
-import Dashboard from './pages/Dashboard';
-import Profile from './pages/Profile';
+
+// 路由级懒加载，减少首屏包体积
+const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/Register'));
+const Home = lazy(() => import('./pages/Home'));
+const EventDetail = lazy(() => import('./pages/EventDetail'));
+const CreateEvent = lazy(() => import('./pages/CreateEvent'));
+const EventManage = lazy(() => import('./pages/EventManage'));
+const MapPage = lazy(() => import('./pages/MapPage'));
+const AIPlan = lazy(() => import('./pages/AIPlan'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Profile = lazy(() => import('./pages/Profile'));
+
+/** 全局加载占位符 */
+function PageLoading() {
+  return (
+    <div className="flex items-center justify-center min-h-[50vh]">
+      <div className="animate-spin rounded-full h-10 w-10 border-4 border-primary-200 border-t-primary-500" />
+    </div>
+  );
+}
 
 function App() {
   return (
     <Routes>
       {/* 公开路由 */}
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
+      <Route path="/login" element={<Suspense fallback={<PageLoading />}><Login /></Suspense>} />
+      <Route path="/register" element={<Suspense fallback={<PageLoading />}><Register /></Suspense>} />
 
       {/* 需要登录的路由 */}
       <Route
@@ -27,20 +39,20 @@ function App() {
           </ProtectedRoute>
         }
       >
-        <Route path="/" element={<Home />} />
-        <Route path="/events/:id" element={<EventDetail />} />
-        <Route path="/events/create" element={<CreateEvent />} />
-        <Route path="/events/:id/manage" element={<EventManage />} />
-        <Route path="/map" element={<MapPage />} />
-        <Route path="/ai-plan" element={<AIPlan />} />
-        <Route path="/profile" element={<Profile />} />
+        <Route path="/" element={<Suspense fallback={<PageLoading />}><Home /></Suspense>} />
+        <Route path="/events/:id" element={<Suspense fallback={<PageLoading />}><EventDetail /></Suspense>} />
+        <Route path="/events/create" element={<Suspense fallback={<PageLoading />}><CreateEvent /></Suspense>} />
+        <Route path="/events/:id/manage" element={<Suspense fallback={<PageLoading />}><EventManage /></Suspense>} />
+        <Route path="/map" element={<Suspense fallback={<PageLoading />}><MapPage /></Suspense>} />
+        <Route path="/ai-plan" element={<Suspense fallback={<PageLoading />}><AIPlan /></Suspense>} />
+        <Route path="/profile" element={<Suspense fallback={<PageLoading />}><Profile /></Suspense>} />
 
         {/* 管理端路由 */}
         <Route
           path="/dashboard"
           element={
             <ProtectedRoute requireAdmin>
-              <Dashboard />
+              <Suspense fallback={<PageLoading />}><Dashboard /></Suspense>
             </ProtectedRoute>
           }
         />

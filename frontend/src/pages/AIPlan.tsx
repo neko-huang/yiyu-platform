@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import client from '../api/client';
+import { getErrorMessage } from '../utils/errors';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -26,11 +27,23 @@ export default function AIPlan() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [currentPlan, setCurrentPlan] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // 自动滚动到最新消息
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // 组件卸载时清理定时器，防止内存泄漏
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleSend = async (e?: FormEvent) => {
     e?.preventDefault();
@@ -40,19 +53,26 @@ export default function AIPlan() {
     setMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
     setInput('');
     setLoading(true);
+    setErrorMsg('');
 
     try {
       const res = await client.post('/ai/plan', { prompt: userMessage });
       const planContent = res.data.plan || res.data.content || '抱歉，我暂时无法生成方案，请稍后重试。';
       setMessages((prev) => [...prev, { role: 'assistant', content: planContent }]);
       setCurrentPlan(planContent);
-    } catch {
+    } catch (err) {
       // 后端未启动 - 模拟 AI 响应
-      const mockPlan = generateMockPlan(userMessage);
-      setTimeout(() => {
-        setMessages((prev) => [...prev, { role: 'assistant', content: mockPlan }]);
-        setCurrentPlan(mockPlan);
-      }, 1500);
+      const isNetworkErr = err instanceof Error && !('response' in err && (err as { response?: unknown }).response);
+      if (isNetworkErr) {
+        const mockPlan = generateMockPlan(userMessage);
+        timeoutRef.current = setTimeout(() => {
+          setMessages((prev) => [...prev, { role: 'assistant', content: mockPlan }]);
+          setCurrentPlan(mockPlan);
+          timeoutRef.current = null;
+        }, 1500);
+      } else {
+        setErrorMsg(getErrorMessage(err, 'AI 服务暂时不可用，请稍后重试'));
+      }
     } finally {
       setLoading(false);
     }
@@ -64,7 +84,9 @@ export default function AIPlan() {
     const savedPlans = JSON.parse(localStorage.getItem('savedPlans') || '[]');
     savedPlans.push({ content: currentPlan, saved_at: new Date().toISOString() });
     localStorage.setItem('savedPlans', JSON.stringify(savedPlans));
-    alert('方案已保存！');
+    setErrorMsg('方案已保存！');
+    // 3 秒后清除提示
+    setTimeout(() => setErrorMsg(''), 3000);
   };
 
   const handleConvertToEvent = () => {
@@ -81,12 +103,17 @@ export default function AIPlan() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <span className="text-2xl">✨</span>
+              <span className="text-2xl" aria-hidden="true">✨</span>
               AI 活动策划助手
             </h1>
             <p className="text-xs text-gray-500 mt-0.5">智能生成专业活动方案，让策划变得简单</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            {errorMsg && (
+              <span className={`text-sm ${errorMsg.includes('已保存') ? 'text-green-600' : 'text-red-500'}`}>
+                {errorMsg}
+              </span>
+            )}
             <button
               onClick={handleSavePlan}
               disabled={!currentPlan}
@@ -109,7 +136,7 @@ export default function AIPlan() {
         {/* Chat area */}
         <div className="flex-1 flex flex-col">
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
+          <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4" aria-live="polite">
             <div className="max-w-3xl mx-auto">
               {messages.map((msg, idx) => (
                 <div
@@ -138,7 +165,7 @@ export default function AIPlan() {
                 <div className="flex justify-start mb-4">
                   <div className="bg-white border border-gray-200 rounded-2xl px-4 py-3">
                     <div className="flex items-center gap-2">
-                      <div className="flex gap-1">
+                      <div className="flex gap-1" aria-hidden="true">
                         <span className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                         <span className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
                         <span className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
@@ -183,6 +210,7 @@ export default function AIPlan() {
                 className="input-field flex-1"
                 placeholder="描述你想要的活动..."
                 disabled={loading}
+                aria-label="输入活动描述"
               />
               <button
                 type="submit"
@@ -207,7 +235,7 @@ export default function AIPlan() {
               </div>
             ) : (
               <div className="text-center text-gray-400 mt-12">
-                <div className="text-4xl mb-3">📝</div>
+                <div className="text-4xl mb-3" aria-hidden="true">📝</div>
                 <p className="text-sm">与 AI 对话后，生成的方案将显示在这里</p>
               </div>
             )}

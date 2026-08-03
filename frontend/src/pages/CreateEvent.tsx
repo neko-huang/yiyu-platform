@@ -1,14 +1,9 @@
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import MapView from '../components/MapView';
 import client from '../api/client';
-
-const categories = ['户外', '音乐', '读书', '运动', '讲座', '科技', '美食', '艺术', '其他'];
-const eventTypes = [
-  { value: 'offline', label: '线下' },
-  { value: 'online', label: '线上' },
-  { value: 'hybrid', label: '混合（线上+线下）' },
-];
+import { createCategories, eventTypes } from '../utils/constants';
+import { getErrorMessage } from '../utils/errors';
 
 interface FormData {
   title: string;
@@ -28,24 +23,42 @@ interface FormData {
 export default function CreateEvent() {
   const navigate = useNavigate();
 
-  const [formData, setFormData] = useState<FormData>({
-    title: '',
-    description: '',
-    type: 'offline',
-    category: '户外',
-    start_time: '',
-    end_time: '',
-    location_name: '',
-    latitude: 39.9042,
-    longitude: 116.4074,
-    max_participants: 50,
-    price: 0,
-    tags: '',
+  const [formData, setFormData] = useState<FormData>(() => {
+    // 从 sessionStorage 读取 AI 策划内容预填描述
+    const aiPlan = sessionStorage.getItem('aiPlanContent');
+    if (aiPlan) {
+      sessionStorage.removeItem('aiPlanContent');
+    }
+    return {
+      title: '',
+      description: aiPlan || '',
+      type: 'offline',
+      category: '户外',
+      start_time: '',
+      end_time: '',
+      location_name: '',
+      latitude: 39.9042,
+      longitude: 116.4074,
+      max_participants: 50,
+      price: 0,
+      tags: '',
+    };
   });
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showAIModal, setShowAIModal] = useState(false);
+
+  // AI 模态框：Escape 键关闭
+  const closeModal = useCallback(() => setShowAIModal(false), []);
+  useEffect(() => {
+    if (!showAIModal) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeModal();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [showAIModal, closeModal]);
 
   const handleChange = (field: keyof FormData, value: string | number) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -59,12 +72,28 @@ export default function CreateEvent() {
     e.preventDefault();
     setError('');
 
+    // 表单验证
     if (!formData.title.trim()) {
       setError('请输入活动标题');
       return;
     }
     if (!formData.start_time || !formData.end_time) {
       setError('请选择活动时间');
+      return;
+    }
+    // 验证结束时间晚于开始时间
+    if (new Date(formData.end_time) <= new Date(formData.start_time)) {
+      setError('结束时间必须晚于开始时间');
+      return;
+    }
+    // 验证人数上限
+    if (formData.max_participants < 1) {
+      setError('人数上限至少为1');
+      return;
+    }
+    // 验证价格不为负
+    if (formData.price < 0) {
+      setError('参与费用不能为负数');
       return;
     }
 
@@ -81,10 +110,8 @@ export default function CreateEvent() {
       };
       const res = await client.post('/events', payload);
       navigate(`/events/${res.data.id}`);
-    } catch {
-      // 后端未启动，模拟成功
-      console.log('后端未连接，模拟创建成功');
-      navigate('/');
+    } catch (err) {
+      setError(getErrorMessage(err, '创建活动失败，请稍后重试'));
     } finally {
       setLoading(false);
     }
@@ -102,18 +129,30 @@ export default function CreateEvent() {
           onClick={() => setShowAIModal(true)}
           className="btn-primary flex items-center gap-2"
         >
-          <span className="text-lg">✨</span>
+          <span className="text-lg" aria-hidden="true">✨</span>
           <span>AI帮我策划</span>
         </button>
       </div>
 
       {/* AI Modal */}
       {showAIModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowAIModal(false)}>
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={closeModal}
+          role="dialog"
+          aria-modal="true"
+          aria-label="AI活动策划助手"
+        >
           <div className="bg-white rounded-xl max-w-2xl w-full p-6 max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-gray-900">✨ AI 活动策划助手</h2>
-              <button onClick={() => setShowAIModal(false)} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
+              <button
+                onClick={closeModal}
+                className="text-gray-400 hover:text-gray-600 text-xl"
+                aria-label="关闭对话框"
+              >
+                ×
+              </button>
             </div>
             <p className="text-gray-500 text-sm mb-4">
               告诉 AI 你想举办什么样的活动，它将为你生成完整的活动方案。
@@ -124,6 +163,7 @@ export default function CreateEvent() {
                 className="input-field"
                 placeholder="例如：周末户外徒步活动，适合家庭参与..."
                 id="ai-prompt-input"
+                aria-label="AI策划提示词"
               />
               <button
                 onClick={() => {
@@ -144,7 +184,7 @@ export default function CreateEvent() {
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-6">
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg p-3">
+          <div className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg p-3" role="alert">
             {error}
           </div>
         )}
@@ -154,8 +194,9 @@ export default function CreateEvent() {
           <h2 className="text-lg font-semibold text-gray-900">基本信息</h2>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">活动标题 *</label>
+            <label htmlFor="event-title" className="block text-sm font-medium text-gray-700 mb-1.5">活动标题 *</label>
             <input
+              id="event-title"
               type="text"
               value={formData.title}
               onChange={(e) => handleChange('title', e.target.value)}
@@ -166,8 +207,9 @@ export default function CreateEvent() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">活动描述</label>
+            <label htmlFor="event-description" className="block text-sm font-medium text-gray-700 mb-1.5">活动描述</label>
             <textarea
+              id="event-description"
               value={formData.description}
               onChange={(e) => handleChange('description', e.target.value)}
               className="input-field min-h-[120px] resize-y"
@@ -177,8 +219,9 @@ export default function CreateEvent() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">活动类型</label>
+              <label htmlFor="event-type" className="block text-sm font-medium text-gray-700 mb-1.5">活动类型</label>
               <select
+                id="event-type"
                 value={formData.type}
                 onChange={(e) => handleChange('type', e.target.value)}
                 className="input-field"
@@ -190,13 +233,14 @@ export default function CreateEvent() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">活动分类</label>
+              <label htmlFor="event-category" className="block text-sm font-medium text-gray-700 mb-1.5">活动分类</label>
               <select
+                id="event-category"
                 value={formData.category}
                 onChange={(e) => handleChange('category', e.target.value)}
                 className="input-field"
               >
-                {categories.map((c) => (
+                {createCategories.map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}
               </select>
@@ -210,8 +254,9 @@ export default function CreateEvent() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">开始时间 *</label>
+              <label htmlFor="event-start" className="block text-sm font-medium text-gray-700 mb-1.5">开始时间 *</label>
               <input
+                id="event-start"
                 type="datetime-local"
                 value={formData.start_time}
                 onChange={(e) => handleChange('start_time', e.target.value)}
@@ -221,8 +266,9 @@ export default function CreateEvent() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">结束时间 *</label>
+              <label htmlFor="event-end" className="block text-sm font-medium text-gray-700 mb-1.5">结束时间 *</label>
               <input
+                id="event-end"
                 type="datetime-local"
                 value={formData.end_time}
                 onChange={(e) => handleChange('end_time', e.target.value)}
@@ -233,8 +279,9 @@ export default function CreateEvent() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">地点名称</label>
+            <label htmlFor="event-location" className="block text-sm font-medium text-gray-700 mb-1.5">地点名称</label>
             <input
+              id="event-location"
               type="text"
               value={formData.location_name}
               onChange={(e) => handleChange('location_name', e.target.value)}
@@ -245,8 +292,9 @@ export default function CreateEvent() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">纬度</label>
+              <label htmlFor="event-lat" className="block text-sm font-medium text-gray-700 mb-1.5">纬度</label>
               <input
+                id="event-lat"
                 type="number"
                 step="any"
                 value={formData.latitude}
@@ -255,8 +303,9 @@ export default function CreateEvent() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">经度</label>
+              <label htmlFor="event-lng" className="block text-sm font-medium text-gray-700 mb-1.5">经度</label>
               <input
+                id="event-lng"
                 type="number"
                 step="any"
                 value={formData.longitude}
@@ -287,8 +336,9 @@ export default function CreateEvent() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">人数上限</label>
+              <label htmlFor="event-max-participants" className="block text-sm font-medium text-gray-700 mb-1.5">人数上限</label>
               <input
+                id="event-max-participants"
                 type="number"
                 min="1"
                 value={formData.max_participants}
@@ -298,8 +348,9 @@ export default function CreateEvent() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">参与费用 (元)</label>
+              <label htmlFor="event-price" className="block text-sm font-medium text-gray-700 mb-1.5">参与费用 (元)</label>
               <input
+                id="event-price"
                 type="number"
                 min="0"
                 value={formData.price}
@@ -311,8 +362,9 @@ export default function CreateEvent() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">活动标签</label>
+            <label htmlFor="event-tags" className="block text-sm font-medium text-gray-700 mb-1.5">活动标签</label>
             <input
+              id="event-tags"
               type="text"
               value={formData.tags}
               onChange={(e) => handleChange('tags', e.target.value)}

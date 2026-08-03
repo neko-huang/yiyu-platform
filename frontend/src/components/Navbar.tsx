@@ -32,7 +32,7 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2 flex-shrink-0">
+          <Link to="/" className="flex items-center gap-2 flex-shrink-0" aria-label="益屿首页">
             <div className="w-9 h-9 bg-gradient-to-br from-primary-500 to-primary-700 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-lg">益</span>
             </div>
@@ -40,18 +40,19 @@ export default function Navbar() {
           </Link>
 
           {/* Nav links */}
-          <nav className="flex items-center gap-1 flex-1 justify-center">
+          <nav className="flex items-center gap-1 flex-1 justify-center" aria-label="主导航">
             {navItems.map((item) => (
               <Link
                 key={item.path}
                 to={item.path}
+                aria-label={item.label}
                 className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                   isActive(item.path)
                     ? 'bg-primary-50 text-primary-700'
                     : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                 }`}
               >
-                <span className="mr-1">{item.icon}</span>
+                <span className="mr-1" aria-hidden="true">{item.icon}</span>
                 <span className="hidden sm:inline">{item.label}</span>
               </Link>
             ))}
@@ -60,13 +61,14 @@ export default function Navbar() {
                 <Link
                   key={item.path}
                   to={item.path}
+                  aria-label={item.label}
                   className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                     isActive(item.path)
                       ? 'bg-primary-50 text-primary-700'
                       : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                   }`}
                 >
-                  <span className="mr-1">{item.icon}</span>
+                  <span className="mr-1" aria-hidden="true">{item.icon}</span>
                   <span className="hidden sm:inline">{item.label}</span>
                 </Link>
               ))}
@@ -74,9 +76,14 @@ export default function Navbar() {
 
           {/* Right section */}
           <div className="flex items-center gap-3">
-            <Link to="/events/create" className="btn-primary text-sm hidden sm:flex items-center gap-1">
+            {/* 移动端只显示 + 图标，桌面端显示完整按钮 */}
+            <Link
+              to="/events/create"
+              className="btn-primary text-sm flex items-center gap-1 px-3 sm:px-4"
+              aria-label="创建活动"
+            >
               <span>+</span>
-              <span>创建活动</span>
+              <span className="hidden sm:inline">创建活动</span>
             </Link>
             {user && (
               <div className="flex items-center gap-3">
@@ -99,6 +106,7 @@ export default function Navbar() {
                 <button
                   onClick={handleLogout}
                   className="text-sm text-gray-500 hover:text-red-500 transition-colors px-2 py-1"
+                  aria-label="退出登录"
                 >
                   退出
                 </button>

@@ -4,6 +4,8 @@ import MapView from '../components/MapView';
 import { useAuth } from '../contexts/AuthContext';
 import client from '../api/client';
 import type { Event, Registration, FinanceRecord } from '../types';
+import { statusLabels, getEventTypeLabel } from '../utils/constants';
+import { getErrorMessage } from '../utils/errors';
 
 // 模拟详情数据
 const mockEventDetail: Record<number, Event> = {
@@ -39,13 +41,6 @@ const mockFinance: FinanceRecord[] = [
   { id: 3, event_id: 1, type: 'expense', category: '补给', amount: 200, description: '矿泉水和能量棒', created_at: '2026-08-02T00:00:00' },
 ];
 
-const statusLabels: Record<string, { text: string; color: string }> = {
-  pending: { text: '待审核', color: 'bg-amber-100 text-amber-700' },
-  approved: { text: '已通过', color: 'bg-green-100 text-green-700' },
-  rejected: { text: '已拒绝', color: 'bg-red-100 text-red-700' },
-  checked_in: { text: '已签到', color: 'bg-blue-100 text-blue-700' },
-};
-
 export default function EventDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -58,6 +53,7 @@ export default function EventDetail() {
   const [error, setError] = useState('');
   const [registering, setRegistering] = useState(false);
   const [registrationStatus, setRegistrationStatus] = useState<string | null>(null);
+  const [registerError, setRegisterError] = useState('');
 
   const eventId = Number(id);
 
@@ -97,7 +93,9 @@ export default function EventDetail() {
   }, [fetchEventDetail]);
 
   const handleRegister = async () => {
+    if (registering) return; // 防重复提交
     setRegistering(true);
+    setRegisterError('');
     try {
       await client.post(`/events/${id}/register`);
       setRegistrationStatus('pending');
@@ -105,11 +103,19 @@ export default function EventDetail() {
       if (event) {
         setEvent({ ...event, current_participants: event.current_participants + 1 });
       }
-    } catch {
-      // 模拟成功
-      setRegistrationStatus('pending');
-      if (event) {
-        setEvent({ ...event, current_participants: event.current_participants + 1 });
+    } catch (err) {
+      // 检查是否为 403（已报名）或 409（名额已满）
+      const status = err instanceof Error ? (err as { response?: { status?: number } }).response?.status : undefined;
+      if (status === 403) {
+        setRegisterError('您已报名此活动或无权报名');
+      } else if (status === 409) {
+        setRegisterError('名额已满');
+      } else {
+        // 后端未启动 - 模拟成功
+        setRegistrationStatus('pending');
+        if (event) {
+          setEvent({ ...event, current_participants: event.current_participants + 1 });
+        }
       }
     } finally {
       setRegistering(false);
@@ -149,11 +155,11 @@ export default function EventDetail() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Breadcrumb */}
-      <div className="mb-4 text-sm text-gray-500">
+      <nav className="mb-4 text-sm text-gray-500" aria-label="面包屑导航">
         <Link to="/" className="hover:text-primary-600">首页</Link>
         <span className="mx-2">/</span>
         <span className="text-gray-700">{event.title}</span>
-      </div>
+      </nav>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Main content */}
@@ -161,7 +167,7 @@ export default function EventDetail() {
           {/* Cover */}
           <div className="h-64 sm:h-80 rounded-xl bg-gradient-to-br from-primary-400 to-primary-700 flex items-center justify-center overflow-hidden">
             {event.cover_image ? (
-              <img src={event.cover_image} alt={event.title} className="w-full h-full object-cover" />
+              <img src={event.cover_image} alt={event.title} loading="lazy" className="w-full h-full object-cover" />
             ) : (
               <span className="text-white text-5xl font-bold opacity-30">{event.category}</span>
             )}
@@ -170,7 +176,7 @@ export default function EventDetail() {
           {/* Title & badges */}
           <div>
             <div className="flex items-center gap-2 mb-3">
-              <span className="tag bg-primary-100 text-primary-700">{event.type === 'offline' ? '线下' : event.type === 'online' ? '线上' : '混合'}</span>
+              <span className="tag bg-primary-100 text-primary-700">{getEventTypeLabel(event.type)}</span>
               <span className="tag bg-green-100 text-green-700">{event.category}</span>
               <span className="tag bg-gray-100 text-gray-600">{event.status === 'published' ? '已发布' : event.status}</span>
             </div>
@@ -184,7 +190,7 @@ export default function EventDetail() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="card p-4">
               <div className="flex items-center gap-2 text-gray-500 text-sm mb-1">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
                 开始时间
@@ -193,7 +199,7 @@ export default function EventDetail() {
             </div>
             <div className="card p-4">
               <div className="flex items-center gap-2 text-gray-500 text-sm mb-1">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
                 结束时间
@@ -202,7 +208,7 @@ export default function EventDetail() {
             </div>
             <div className="card p-4">
               <div className="flex items-center gap-2 text-gray-500 text-sm mb-1">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
@@ -212,7 +218,7 @@ export default function EventDetail() {
             </div>
             <div className="card p-4">
               <div className="flex items-center gap-2 text-gray-500 text-sm mb-1">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                 </svg>
                 参与费用
@@ -261,7 +267,7 @@ export default function EventDetail() {
                   {event.current_participants} / {event.max_participants}
                 </span>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="w-full bg-gray-200 rounded-full h-2" role="progressbar" aria-valuenow={event.current_participants} aria-valuemax={event.max_participants}>
                 <div
                   className={`h-2 rounded-full ${isFull ? 'bg-red-400' : 'bg-primary-500'}`}
                   style={{ width: `${Math.min((event.current_participants / event.max_participants) * 100, 100)}%` }}
@@ -284,18 +290,25 @@ export default function EventDetail() {
                 您的报名状态：{statusLabels[registrationStatus]?.text}
               </div>
             ) : (
-              <button
-                onClick={handleRegister}
-                disabled={isFull || registering}
-                className="btn-primary w-full"
-              >
-                {registering ? '报名中...' : isFull ? '名额已满' : '立即报名'}
-              </button>
+              <>
+                {registerError && (
+                  <div className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg p-2 mb-3" role="alert">
+                    {registerError}
+                  </div>
+                )}
+                <button
+                  onClick={handleRegister}
+                  disabled={isFull || registering}
+                  className="btn-primary w-full"
+                >
+                  {registering ? '报名中...' : isFull ? '名额已满' : '立即报名'}
+                </button>
+              </>
             )}
 
             <div className="mt-4 pt-4 border-t border-gray-100 text-sm text-gray-500">
               <p>💰 费用：{event.price === 0 ? '免费参加' : `¥${event.price}/人`}</p>
-              <p>👥 名额：{event.max_participants - event.current_participants} 个剩余</p>
+              <p>👥 名额：{Math.max(event.max_participants - event.current_participants, 0)} 个剩余</p>
             </div>
           </div>
 

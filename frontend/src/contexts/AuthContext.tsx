@@ -21,6 +21,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // 初始化：检查 localStorage 中的 token 是否有效
   useEffect(() => {
+    let isMounted = true;
+
     const storedToken = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
 
@@ -32,27 +34,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // 验证 token 是否仍有效
         client.get('/auth/me')
           .then((res) => {
+            if (!isMounted) return;
             if (res.data) {
               setUser(res.data);
               localStorage.setItem('user', JSON.stringify(res.data));
             }
           })
           .catch(() => {
+            if (!isMounted) return;
             // token 失效，清除
             localStorage.removeItem('token');
             localStorage.removeItem('user');
             setToken(null);
             setUser(null);
           })
-          .finally(() => setLoading(false));
+          .finally(() => {
+            if (isMounted) setLoading(false);
+          });
       } catch {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     } else {
       setLoading(false);
     }
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const login = useCallback(async (data: LoginRequest) => {

@@ -10,7 +10,7 @@ class FinanceRecordCreate(BaseModel):
     type: Literal["income", "expense"]
     category: str = "other"  # ticket/sponsorship/venue/material/labor/other
     amount: float = Field(..., gt=0)
-    description: str | None = None
+    description: str | None = Field(None, max_length=500)
 
 
 class FinanceRecordOut(BaseModel):
@@ -32,3 +32,11 @@ class FinanceSummary(BaseModel):
     income_by_category: dict[str, float] = {}
     expense_by_category: dict[str, float] = {}
     record_count: int = 0
+
+
+class FinanceListOut(BaseModel):
+    """财务记录列表分页响应"""
+    total: int
+    page: int
+    page_size: int
+    items: list[FinanceRecordOut]

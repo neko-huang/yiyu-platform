@@ -4,18 +4,30 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from config import logger
 from database import get_db
 from models import Event, User
+from routers.dependencies import check_organizer, get_current_user, get_event_or_404
 from schemas.event import (
+    VALID_STATUS_TRANSITIONS,
     EventCreate,
     EventListOut,
     EventMapItem,
     EventOut,
     EventUpdate,
 )
-from routers.dependencies import get_current_user
 
 router = APIRouter(prefix="/events", tags=["活动"])
+
+
+def _validate_status_transition(current: str, target: str) -> None:
+    """校验活动状态流转是否合法"""
+    allowed = VALID_STATUS_TRANSITIONS.get(current, set())
+    if target not in allowed:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"活动状态不允许从「{current}」变更为「{target}」",
+        )
 
 
 @router.get("", response_model=EventListOut)
@@ -38,22 +50,31 @@ async def list_events(
     if keyword:
         query = query.where(Event.title.contains(keyword))
 
-    # 总数
-    count_query = select(func.count()).select_from(query.subquery())
-    total = (await db.execute(count_query)).scalar() or 0
-
-    # 分页
-    query = query.offset((page - 1) * page_size).limit(page_size).order_by(Event.created_at.desc())
-    result = await db.execute(query)
-    events = result.scalars().all()
-
-    # 标签过滤（SQLite JSON 无法原生查询，在 Python 中过滤）
-    items = [EventOut.model_validate(e) for e in events]
+    # 标签过滤需要先在 SQL 层获取候选集，再在 Python 中精确过滤
+    # 如果有 tag 过滤，需要先获取全部匹配项再过滤（SQLite JSON 限制）
     if tag:
-        items = [e for e in items if tag in e.tags]
+        # 不分页，先获取所有候选，在 Python 中过滤标签
+        result = await db.execute(query.order_by(Event.created_at.desc()))
+        events = result.scalars().all()
+        items = [EventOut.model_validate(e) for e in events if tag in e.tags]
+        total = len(items)
+        # 手动分页
+        start = (page - 1) * page_size
+        end = start + page_size
+        items = items[start:end]
+    else:
+        # 总数
+        count_query = select(func.count()).select_from(query.subquery())
+        total = (await db.execute(count_query)).scalar() or 0
+
+        # 分页
+        query = query.offset((page - 1) * page_size).limit(page_size).order_by(Event.created_at.desc())
+        result = await db.execute(query)
+        events = result.scalars().all()
+        items = [EventOut.model_validate(e) for e in events]
 
     return EventListOut(
-        total=total if not tag else len(items),
+        total=total,
         page=page,
         page_size=page_size,
         items=items,
@@ -61,7 +82,9 @@ async def list_events(
 
 
 @router.get("/map", response_model=list[EventMapItem])
-async def get_events_map(db: AsyncSession = Depends(get_db)):
+async def get_events_map(
+    db: AsyncSession = Depends(get_db),
+):
     """获取所有已发布活动的地理位置数据"""
     result = await db.execute(
         select(Event).where(Event.status.in_(["published", "ongoing", "finished"]))
@@ -84,10 +107,7 @@ async def get_events_map(db: AsyncSession = Depends(get_db)):
 
 @router.get("/{event_id}", response_model=EventOut)
 async def get_event(event_id: int, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Event).where(Event.id == event_id))
-    event = result.scalar_one_or_none()
-    if not event:
-        raise HTTPException(status_code=404, detail="活动不存在")
+    event = await get_event_or_404(event_id, db)
     return EventOut.model_validate(event)
 
 
@@ -106,6 +126,7 @@ async def create_event(
     db.add(event)
     await db.flush()
     await db.refresh(event)
+    logger.info("用户 %s 创建活动 %s", current_user.id, event.id)
     return EventOut.model_validate(event)
 
 
@@ -116,13 +137,8 @@ async def update_event(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(Event).where(Event.id == event_id))
-    event = result.scalar_one_or_none()
-    if not event:
-        raise HTTPException(status_code=404, detail="活动不存在")
-
-    if event.organizer_id != current_user.id and current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="无权修改此活动")
+    event = await get_event_or_404(event_id, db)
+    check_organizer(event, current_user, "无权修改此活动")
 
     update_data = payload.model_dump(exclude_unset=True)
     for key, value in update_data.items():
@@ -139,15 +155,11 @@ async def delete_event(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(Event).where(Event.id == event_id))
-    event = result.scalar_one_or_none()
-    if not event:
-        raise HTTPException(status_code=404, detail="活动不存在")
-
-    if event.organizer_id != current_user.id and current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="无权删除此活动")
+    event = await get_event_or_404(event_id, db)
+    check_organizer(event, current_user, "无权删除此活动")
 
     await db.delete(event)
+    logger.info("用户 %s 删除活动 %s", current_user.id, event_id)
 
 
 @router.put("/{event_id}/publish", response_model=EventOut)
@@ -156,15 +168,67 @@ async def publish_event(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(Event).where(Event.id == event_id))
-    event = result.scalar_one_or_none()
-    if not event:
-        raise HTTPException(status_code=404, detail="活动不存在")
+    event = await get_event_or_404(event_id, db)
+    check_organizer(event, current_user, "无权发布此活动")
 
-    if event.organizer_id != current_user.id and current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="无权发布此活动")
+    _validate_status_transition(event.status, "published")
 
     event.status = "published"
+    await db.flush()
+    await db.refresh(event)
+    logger.info("活动 %s 已发布", event_id)
+    return EventOut.model_validate(event)
+
+
+@router.put("/{event_id}/start", response_model=EventOut)
+async def start_event(
+    event_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """将活动状态从 published 变更为 ongoing"""
+    event = await get_event_or_404(event_id, db)
+    check_organizer(event, current_user, "无权操作此活动")
+
+    _validate_status_transition(event.status, "ongoing")
+
+    event.status = "ongoing"
+    await db.flush()
+    await db.refresh(event)
+    return EventOut.model_validate(event)
+
+
+@router.put("/{event_id}/finish", response_model=EventOut)
+async def finish_event(
+    event_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """将活动状态从 ongoing 变更为 finished"""
+    event = await get_event_or_404(event_id, db)
+    check_organizer(event, current_user, "无权操作此活动")
+
+    _validate_status_transition(event.status, "finished")
+
+    event.status = "finished"
+    await db.flush()
+    await db.refresh(event)
+    return EventOut.model_validate(event)
+
+
+@router.put("/{event_id}/archive", response_model=EventOut)
+async def archive_event(
+    event_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """将活动状态归档"""
+    event = await get_event_or_404(event_id, db)
+    check_organizer(event, current_user, "无权操作此活动")
+
+    _validate_status_transition(event.status, "archived")
+
+    event.status = "archived"
     await db.flush()
     await db.refresh(event)
     return EventOut.model_validate(event)

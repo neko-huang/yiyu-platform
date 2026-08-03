@@ -1,10 +1,10 @@
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { Event } from '../types';
 
 // 修复 Leaflet 默认图标问题
-delete (L.Icon.Default.prototype as Record<string, unknown>)._getIconUrl;
+delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
@@ -21,6 +21,16 @@ interface MapViewProps {
   interactive?: boolean;
 }
 
+/** 子组件：通过 useMapEvents 监听地图点击事件 */
+function ClickHandler({ onMapClick }: { onMapClick: (lat: number, lng: number) => void }) {
+  useMapEvents({
+    click: (e) => {
+      onMapClick(e.latlng.lat, e.latlng.lng);
+    },
+  });
+  return null;
+}
+
 export default function MapView({
   events = [],
   center = [35.86166, 104.195397], // 中国中心点
@@ -30,12 +40,6 @@ export default function MapView({
   onMapClick,
   interactive = false,
 }: MapViewProps) {
-  const handleMapClick = (e: L.LeafletMouseEvent) => {
-    if (onMapClick) {
-      onMapClick(e.latlng.lat, e.latlng.lng);
-    }
-  };
-
   return (
     <div style={{ height }} className="rounded-xl overflow-hidden border border-gray-200">
       <MapContainer
@@ -43,12 +47,14 @@ export default function MapView({
         zoom={zoom}
         style={{ width: '100%', height: '100%' }}
         scrollWheelZoom={interactive}
-        eventHandlers={onMapClick ? { click: handleMapClick } : undefined}
       >
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         />
+
+        {/* 地图点击事件处理（仅在交互模式下） */}
+        {onMapClick && <ClickHandler onMapClick={onMapClick} />}
 
         {/* Single marker mode (for event detail / create event) */}
         {singleMarker && (

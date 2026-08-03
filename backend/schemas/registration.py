@@ -1,8 +1,17 @@
 """报名相关 Schema"""
 
 from datetime import datetime
+from enum import Enum
 
 from pydantic import BaseModel, Field
+
+
+class RegistrationStatus(str, Enum):
+    """报名状态"""
+    pending = "pending"
+    approved = "approved"
+    rejected = "rejected"
+    checked_in = "checked_in"
 
 
 class RegistrationCreate(BaseModel):
@@ -26,3 +35,11 @@ class RegistrationWithUserOut(RegistrationOut):
     username: str | None = None
     display_name: str | None = None
     email: str | None = None
+
+
+class RegistrationListOut(BaseModel):
+    """报名列表分页响应"""
+    total: int
+    page: int
+    page_size: int
+    items: list[RegistrationWithUserOut]

@@ -1,6 +1,7 @@
 import { useState, FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { getErrorMessage } from '../utils/errors';
 
 export default function Register() {
   const { register } = useAuth();
@@ -17,6 +18,19 @@ export default function Register() {
     e.preventDefault();
     setError('');
 
+    // 前端表单验证
+    if (!username.trim() || !email.trim() || !password.trim()) {
+      setError('请填写所有必填字段');
+      return;
+    }
+
+    // 简单邮箱格式校验
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError('请输入有效的邮箱地址');
+      return;
+    }
+
     if (password !== confirmPassword) {
       setError('两次输入的密码不一致');
       return;
@@ -30,14 +44,10 @@ export default function Register() {
     setLoading(true);
 
     try {
-      await register({ username, email, password });
+      await register({ username: username.trim(), email: email.trim(), password });
       navigate('/', { replace: true });
     } catch (err: unknown) {
-      const msg =
-        err instanceof Error
-          ? err.message
-          : '注册失败，请稍后重试';
-      setError(msg);
+      setError(getErrorMessage(err, '注册失败，请稍后重试'));
     } finally {
       setLoading(false);
     }
@@ -59,14 +69,15 @@ export default function Register() {
         <div className="card p-8">
           <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg p-3">
+              <div className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg p-3" role="alert">
                 {error}
               </div>
             )}
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">用户名</label>
+              <label htmlFor="reg-username" className="block text-sm font-medium text-gray-700 mb-1.5">用户名</label>
               <input
+                id="reg-username"
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
@@ -78,8 +89,9 @@ export default function Register() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">邮箱</label>
+              <label htmlFor="reg-email" className="block text-sm font-medium text-gray-700 mb-1.5">邮箱</label>
               <input
+                id="reg-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -91,8 +103,9 @@ export default function Register() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">密码</label>
+              <label htmlFor="reg-password" className="block text-sm font-medium text-gray-700 mb-1.5">密码</label>
               <input
+                id="reg-password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -100,12 +113,14 @@ export default function Register() {
                 placeholder="至少6位字符"
                 required
                 autoComplete="new-password"
+                minLength={6}
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">确认密码</label>
+              <label htmlFor="reg-confirm-password" className="block text-sm font-medium text-gray-700 mb-1.5">确认密码</label>
               <input
+                id="reg-confirm-password"
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
