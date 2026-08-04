@@ -95,9 +95,14 @@ async def list_events(
 async def get_events_map(
     db: AsyncSession = Depends(get_db),
 ):
-    """获取所有已发布活动的地理位置数据"""
+    """获取所有已发布活动的地理位置数据（排除线上活动）"""
     result = await db.execute(
-        select(Event).where(Event.status.in_(["published", "ongoing", "finished"]))
+        select(Event).where(
+            Event.status.in_(["published", "ongoing", "finished"]),
+            Event.type != "online",
+            Event.latitude.isnot(None),
+            Event.longitude.isnot(None),
+        )
     )
     events = result.scalars().all()
     return [
@@ -109,9 +114,12 @@ async def get_events_map(
             longitude=e.longitude,
             start_time=e.start_time,
             category=e.category,
+            type=e.type,
+            current_participants=e.current_participants,
+            max_participants=e.max_participants,
+            price=e.price,
         )
         for e in events
-        if e.latitude is not None and e.longitude is not None
     ]
 
 

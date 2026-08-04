@@ -1,4 +1,4 @@
-import { useState, FormEvent, useEffect, useCallback, useRef } from 'react';
+import { useState, FormEvent, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import MapView from '../components/MapView';
 import client from '../api/client';
@@ -103,11 +103,8 @@ export default function CreateEvent() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [showAIModal, closeModal]);
 
-  // 兜底：如果 useState 初始值未能读取（组件复用），用 useEffect 再检查一次
-  const dataLoadedRef = useRef(false);
+  // 兜底：每次组件挂载时检查 AI 方案数据（从 AIPlan 页面导航过来时触发）
   useEffect(() => {
-    if (dataLoadedRef.current) return;
-    dataLoadedRef.current = true;
     const aiData = readAIPlanData();
     if (aiData) {
       setFormData((prev) => ({
@@ -167,7 +164,7 @@ export default function CreateEvent() {
           .split(/[,，\s]+/)
           .map((t) => t.trim())
           .filter(Boolean),
-        status: 'draft',
+        status: 'published',
       };
       const res = await client.post('/events', payload);
       navigate(`/events/${res.data.id}`);

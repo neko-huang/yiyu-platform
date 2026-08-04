@@ -3,19 +3,7 @@ import MapView from '../components/MapView';
 import client from '../api/client';
 import type { Event } from '../types';
 
-// 模拟数据 - 覆盖多个城市的活动（含经纬度）
-const mockEvents: Event[] = [
-  { id: 1, title: '周末香山徒步登山活动', description: '香山红叶徒步', organizer_id: 1, type: 'offline', category: '户外', start_time: '2026-08-10T08:00:00', end_time: '2026-08-10T16:00:00', location_name: '北京香山公园', latitude: 39.9929, longitude: 116.1883, max_participants: 50, current_participants: 32, price: 50, status: 'published', tags: ['徒步'] },
-  { id: 2, title: '城市民谣音乐之夜', description: '民谣现场演出', organizer_id: 2, type: 'offline', category: '音乐', start_time: '2026-08-15T19:30:00', end_time: '2026-08-15T22:00:00', location_name: '上海·思南公馆', latitude: 31.2226, longitude: 121.4737, max_participants: 100, current_participants: 67, price: 88, status: 'published', tags: ['民谣'] },
-  { id: 3, title: '《人类简史》读书分享会', description: '读书分享', organizer_id: 3, type: 'hybrid', category: '读书', start_time: '2026-08-12T14:00:00', end_time: '2026-08-12T17:00:00', location_name: '杭州·钟书阁', latitude: 30.2741, longitude: 120.1551, max_participants: 30, current_participants: 30, price: 0, status: 'published', tags: ['读书'] },
-  { id: 4, title: '城市马拉松挑战赛', description: '半程马拉松', organizer_id: 4, type: 'offline', category: '运动', start_time: '2026-08-20T07:00:00', end_time: '2026-08-20T12:00:00', location_name: '成都·锦城湖公园', latitude: 30.5728, longitude: 104.0668, max_participants: 500, current_participants: 287, price: 120, status: 'published', tags: ['跑步'] },
-  { id: 5, title: 'AI与大模型技术前沿讲座', description: '技术讲座', organizer_id: 5, type: 'online', category: '讲座', start_time: '2026-08-08T19:00:00', end_time: '2026-08-08T21:00:00', location_name: '线上·腾讯会议', latitude: 39.9042, longitude: 116.4074, max_participants: 200, current_participants: 156, price: 0, status: 'published', tags: ['AI'] },
-  { id: 6, title: '夏日户外烧烤派对', description: '烧烤派对', organizer_id: 6, type: 'offline', category: '美食', start_time: '2026-08-18T11:00:00', end_time: '2026-08-18T20:00:00', location_name: '北京·怀柔山吧', latitude: 40.3156, longitude: 116.6312, max_participants: 40, current_participants: 18, price: 158, status: 'published', tags: ['烧烤'] },
-  { id: 7, title: '深圳科技创业沙龙', description: '创业分享', organizer_id: 7, type: 'offline', category: '科技', start_time: '2026-08-14T14:00:00', end_time: '2026-08-14T17:00:00', location_name: '深圳·南山科技园', latitude: 22.5431, longitude: 113.9445, max_participants: 80, current_participants: 45, price: 0, status: 'published', tags: ['创业'] },
-  { id: 8, title: '广州美食文化节', description: '美食文化', organizer_id: 8, type: 'offline', category: '美食', start_time: '2026-08-22T10:00:00', end_time: '2026-08-22T20:00:00', location_name: '广州·天河城', latitude: 23.1291, longitude: 113.2644, max_participants: 200, current_participants: 89, price: 30, status: 'published', tags: ['美食'] },
-  { id: 9, title: '西安古城墙夜跑', description: '夜跑活动', organizer_id: 9, type: 'offline', category: '运动', start_time: '2026-08-16T19:00:00', end_time: '2026-08-16T21:00:00', location_name: '西安·古城墙', latitude: 34.3416, longitude: 108.9398, max_participants: 100, current_participants: 56, price: 20, status: 'published', tags: ['夜跑'] },
-  { id: 10, title: '武汉樱花摄影展', description: '摄影展览', organizer_id: 10, type: 'offline', category: '艺术', start_time: '2026-08-11T09:00:00', end_time: '2026-08-11T17:00:00', location_name: '武汉·东湖', latitude: 30.5928, longitude: 114.3055, max_participants: 60, current_participants: 34, price: 0, status: 'published', tags: ['摄影'] },
-];
+
 
 export default function MapPage() {
   const [events, setEvents] = useState<Event[]>([]);
@@ -25,19 +13,13 @@ export default function MapPage() {
   const fetchEvents = useCallback(async () => {
     setLoading(true);
     try {
-      // 先用 /events/map 获取有经纬度的活动（排除线上活动）
-      const mapRes = await client.get('/events/map');
-      const mapItems = Array.isArray(mapRes.data) ? mapRes.data : [];
-      // 再用 /events?status=published&page_size=100 获取完整活动信息
-      const fullRes = await client.get('/events', { params: { status: 'published', page_size: 100 } });
-      const fullItems: Event[] = fullRes.data.items || [];
-      // 合并：只保留有经纬度的活动，排除线上活动
-      const mapIds = new Set(mapItems.map((m: { id: number }) => m.id));
-      const merged = fullItems.filter((e) => mapIds.has(e.id) && e.type !== 'online');
-      setEvents(merged.length > 0 ? merged : mapItems.filter((m: { type?: string }) => m.type !== 'online'));
+      // /events/map 已排除线上活动，只返回有经纬度坐标的活动
+      const res = await client.get('/events/map');
+      const items = Array.isArray(res.data) ? res.data : [];
+      setEvents(items);
     } catch {
-      // 后端未启动，使用模拟数据（排除线上活动）
-      setEvents(mockEvents.filter((e) => e.type !== 'online'));
+      // 后端未启动，无数据
+      setEvents([]);
     } finally {
       setLoading(false);
     }

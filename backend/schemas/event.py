@@ -124,6 +124,10 @@ class EventMapItem(BaseModel):
     longitude: float | None = None
     start_time: datetime | None = None
     category: str | None = None
+    type: str | None = None
+    current_participants: int = 0
+    max_participants: int | None = None
+    price: float = 0.0
 
 
 class RecommendationItem(EventOut):

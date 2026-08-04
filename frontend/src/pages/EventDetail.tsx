@@ -351,6 +351,21 @@ export default function EventDetail() {
             {isOrganizer ? (
               <div className="space-y-3">
                 <p className="text-sm text-gray-500 text-center">您是此活动的组织者</p>
+                {event.status === 'draft' && (
+                  <button
+                    onClick={async () => {
+                      try {
+                        await client.put(`/events/${event.id}/publish`);
+                        setEvent({ ...event, status: 'published' });
+                      } catch {
+                        setRegisterError('发布失败，请稍后重试');
+                      }
+                    }}
+                    className="btn-primary w-full bg-green-600 hover:bg-green-700"
+                  >
+                    🚀 发布活动
+                  </button>
+                )}
                 <button
                   onClick={() => navigate(`/events/${event.id}/manage`)}
                   className="btn-primary w-full"
