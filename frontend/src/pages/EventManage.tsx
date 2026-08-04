@@ -51,7 +51,7 @@ export default function EventManage() {
       ]);
       setEvent(eventRes.data);
       setRegistrations(regRes.data);
-      setFinanceRecords(finRes.data);
+      setFinanceRecords(finRes.data?.items || finRes.data || []);
 
       // 尝试加载复盘报告（可能不存在）
       try {
