@@ -59,29 +59,35 @@ export default function AlbumPage() {
   }, [fetchAlbums]);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
     setUploading(true);
     try {
-      const uploadRes = await uploadImage(file);
       const albumId = albums[0]?.id || 1;
-      await addAlbumPhoto(albumId, { image_url: uploadRes.url, caption: file.name });
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const uploadRes = await uploadImage(file);
+        await addAlbumPhoto(albumId, { image_url: uploadRes.url, caption: file.name });
+      }
       await fetchAlbums();
     } catch {
-      // Mock: add a placeholder photo
-      const newPhoto: AlbumPhoto = {
-        id: Date.now(),
-        album_id: albums[0]?.id || 1,
-        user_id: 1,
-        image_url: '',
-        caption: file.name,
-        ai_caption: null,
-        sort_order: 99,
-        created_at: new Date().toISOString(),
-      };
-      setAlbums((prev) =>
-        prev.map((a) => (a.id === (albums[0]?.id || 1) ? { ...a, photos: [...a.photos, newPhoto] } : a))
-      );
+      // Mock: add placeholder photos
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const newPhoto: AlbumPhoto = {
+          id: Date.now() + i,
+          album_id: albums[0]?.id || 1,
+          user_id: 1,
+          image_url: '',
+          caption: file.name,
+          ai_caption: null,
+          sort_order: 99,
+          created_at: new Date().toISOString(),
+        };
+        setAlbums((prev) =>
+          prev.map((a) => (a.id === (albums[0]?.id || 1) ? { ...a, photos: [...a.photos, newPhoto] } : a))
+        );
+      }
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -122,17 +128,31 @@ export default function AlbumPage() {
           <h1 className="text-2xl font-bold text-gray-900">📸 活动相册</h1>
           <p className="text-gray-500 text-sm mt-1">共 {allPhotos.length} 张照片</p>
         </div>
-        <label className="btn-primary cursor-pointer flex items-center gap-2">
-          <span>{uploading ? '上传中...' : '+ 上传照片'}</span>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleUpload}
-            disabled={uploading}
-          />
-        </label>
+        <div className="flex gap-2">
+          <label className="btn-secondary cursor-pointer flex items-center gap-2">
+            <span>📷 拍照</span>
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={handleUpload}
+              disabled={uploading}
+            />
+          </label>
+          <label className="btn-primary cursor-pointer flex items-center gap-2">
+            <span>{uploading ? '上传中...' : '🖼️ 从相册选择'}</span>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={handleUpload}
+              disabled={uploading}
+            />
+          </label>
+        </div>
       </div>
 
       {/* Photo Grid */}

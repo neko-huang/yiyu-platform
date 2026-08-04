@@ -4,34 +4,36 @@ import { useAuth } from '../contexts/AuthContext';
 import type { Discussion } from '../types';
 import { getDiscussions, createDiscussion } from '../api/client';
 
-// ===== 模拟数据 =====
-const mockDiscussions: Discussion[] = [
-  {
-    id: 1, event_id: 1, user_id: 1, content: '📢 各位参与者请注意：活动当天早上8点在香山公园东门集合，请准时到达！带好身份证和水壶。',
-    parent_id: null, is_announcement: true, created_at: '2026-08-08T09:00:00', updated_at: '2026-08-08T09:00:00',
-    user_display_name: '山间行者',
-  },
-  {
-    id: 2, event_id: 1, user_id: 10, content: '请问需要带登山杖吗？第一次参加这种活动，有点紧张。',
-    parent_id: null, is_announcement: false, created_at: '2026-08-08T14:00:00', updated_at: '2026-08-08T14:00:00',
-    user_display_name: '山间行者',
-  },
-  {
-    id: 3, event_id: 1, user_id: 1, content: '登山杖可选带，山路有些台阶比较陡。建议穿防滑运动鞋！',
-    parent_id: 2, is_announcement: false, created_at: '2026-08-08T15:30:00', updated_at: '2026-08-08T15:30:00',
-    user_display_name: '山间行者',
-  },
-  {
-    id: 4, event_id: 1, user_id: 11, content: '太期待了！请问活动结束后有聚餐安排吗？',
-    parent_id: null, is_announcement: false, created_at: '2026-08-09T10:00:00', updated_at: '2026-08-09T10:00:00',
-    user_display_name: '自然之友',
-  },
-  {
-    id: 5, event_id: 1, user_id: 12, content: '上次参加类似的徒步活动，风景超棒！大家记得带充电宝拍照📱',
-    parent_id: null, is_announcement: false, created_at: '2026-08-09T16:00:00', updated_at: '2026-08-09T16:00:00',
-    user_display_name: '攀岩达人',
-  },
-];
+// ===== 根据 event_id 生成上下文相关的模拟数据 =====
+function buildMockDiscussions(eventId: number): Discussion[] {
+  return [
+    {
+      id: 1, event_id: eventId, user_id: 1, content: '📢 各位参与者请注意：活动当天请准时到达场地，带好相关物品！',
+      parent_id: null, is_announcement: true, created_at: '2026-08-08T09:00:00', updated_at: '2026-08-08T09:00:00',
+      user_display_name: '活动组织者',
+    },
+    {
+      id: 2, event_id: eventId, user_id: 10, content: '请问第一次参加有什么需要注意的吗？有点紧张😊',
+      parent_id: null, is_announcement: false, created_at: '2026-08-08T14:00:00', updated_at: '2026-08-08T14:00:00',
+      user_display_name: '活动新手',
+    },
+    {
+      id: 3, event_id: eventId, user_id: 1, content: '不用紧张！跟着流程走就好，有问题随时问工作人员～',
+      parent_id: 2, is_announcement: false, created_at: '2026-08-08T15:30:00', updated_at: '2026-08-08T15:30:00',
+      user_display_name: '活动组织者',
+    },
+    {
+      id: 4, event_id: eventId, user_id: 11, content: '太期待了！请问活动结束后有聚餐安排吗？',
+      parent_id: null, is_announcement: false, created_at: '2026-08-09T10:00:00', updated_at: '2026-08-09T10:00:00',
+      user_display_name: '热心参与者',
+    },
+    {
+      id: 5, event_id: eventId, user_id: 12, content: '上次参加类似活动超棒！大家记得带充电宝拍照📱',
+      parent_id: null, is_announcement: false, created_at: '2026-08-09T16:00:00', updated_at: '2026-08-09T16:00:00',
+      user_display_name: '老成员',
+    },
+  ];
+}
 
 export default function DiscussionPage() {
   const { id } = useParams<{ id: string }>();
@@ -50,7 +52,7 @@ export default function DiscussionPage() {
       const data = await getDiscussions(eventId);
       setDiscussions(data.items);
     } catch {
-      setDiscussions(mockDiscussions);
+      setDiscussions(buildMockDiscussions(eventId));
     } finally {
       setLoading(false);
     }

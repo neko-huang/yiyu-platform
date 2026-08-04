@@ -183,17 +183,38 @@ async def generate_sop_from_event(event_data: dict) -> str:
 # ---------------------------------------------------------------------------
 # AI 多平台文案生成
 # ---------------------------------------------------------------------------
-COPYWRITING_PROMPTS = {
-    "wechat": "你是微信公众号编辑。请根据活动信息撰写一篇微信公众号推广文案，包含标题、正文（300字左右）、CTA按钮文案。语气亲切专业。",
-    "xiaohongshu": "你是小红书博主。请根据活动信息撰写一篇小红书风格的种草笔记，包含标题（带emoji）、正文（200字左右）、标签。语气活泼有感染力。",
-    "weibo": "你是微博运营。请根据活动信息撰写一条微博推广文案（140字以内），带话题标签和emoji。",
-    "friends": "你是朋友圈文案高手。请根据活动信息撰写一条朋友圈推广文案（100字以内），自然不做作，引发好奇。",
+# 各平台基础 prompt
+# ---------------------------------------------------------------------------
+COPYWRITING_BASE_PROMPTS = {
+    "wechat": "你是微信公众号编辑。语气亲切专业。",
+    "xiaohongshu": "你是小红书博主。语气活泼有感染力，带emoji。",
+    "weibo": "你是微博运营。140字以内，带话题标签。",
+    "friends": "你是朋友圈文案高手。100字以内，自然不做作，引发好奇。",
+}
+
+# 各 stage 额外指令
+STAGE_INSTRUCTIONS = {
+    "before": (
+        "文案目标：活动预热、吸引报名。\n"
+        "核心内容：强调活动亮点、稀缺性、早鸟优惠、参与价值。\n"
+        "结尾：明确的时间地点、报名方式、CTA（如点击链接报名）。"
+    ),
+    "during": (
+        "文案目标：实时传播活动现场氛围。\n"
+        "核心内容：现场精彩瞬间、参与者反馈、实时花絮、氛围感。\n"
+        "结尾：引导未到场的观众关注后续活动或线上参与。"
+    ),
+    "after": (
+        "文案目标：活动回顾总结。\n"
+        "核心内容：活动成果总结、关键数据（参与人数、好评率）、精彩瞬间回顾、感谢参与者。\n"
+        "结尾：预告下次活动，引导关注平台。"
+    ),
 }
 
 
 async def generate_copywriting(event_data: dict, platform: str) -> str:
     """
-    根据活动信息和目标平台生成推广文案。
+    根据活动信息和目标平台生成推广文案，区分预热/进行中/回顾三个 stage。
 
     Args:
         event_data: 活动信息字典（title, category, description, location, price 等）
@@ -202,9 +223,19 @@ async def generate_copywriting(event_data: dict, platform: str) -> str:
     Returns:
         生成的文案文本
     """
-    system_prompt = COPYWRITING_PROMPTS.get(platform)
-    if not system_prompt:
-        raise ValueError(f"不支持的平台: {platform}，可选: {list(COPYWRITING_PROMPTS.keys())}")
+    base_prompt = COPYWRITING_BASE_PROMPTS.get(platform)
+    if not base_prompt:
+        raise ValueError(f"不支持的平台: {platform}，可选: {list(COPYWRITING_BASE_PROMPTS.keys())}")
+
+    stage = event_data.get("stage", "before")
+    stage_instruction = STAGE_INSTRUCTIONS.get(stage, STAGE_INSTRUCTIONS["before"])
+    stage_label = {"before": "活动预热推广", "during": "活动中实时传播", "after": "活动回顾总结"}.get(stage, "活动推广")
+
+    system_prompt = (
+        f"{base_prompt}\n\n"
+        f"【文案阶段：{stage_label}】\n"
+        f"{stage_instruction}"
+    )
 
     info_lines = [
         f"活动名称：{event_data.get('title', '未命名')}",
@@ -218,9 +249,6 @@ async def generate_copywriting(event_data: dict, platform: str) -> str:
         info_lines.append(f"标签：{', '.join(event_data['tags'])}")
     if event_data.get("description"):
         info_lines.append(f"\n活动描述：{event_data['description']}")
-    if event_data.get("stage"):
-        stage_map = {"before": "活动预热推广", "during": "活动中实时传播", "after": "活动回顾总结"}
-        info_lines.append(f"\n文案阶段：{stage_map.get(event_data['stage'], '活动推广')}")
 
     user_content = "请为以下活动生成推广文案：\n\n" + "\n".join(info_lines)
     return await _call_deepseek(system_prompt, user_content, max_tokens=2048)

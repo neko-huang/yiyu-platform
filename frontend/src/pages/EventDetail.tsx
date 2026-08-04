@@ -134,13 +134,18 @@ export default function EventDetail() {
       const result = await generateCopywriting(eventId, copyPlatform, copyStage);
       setCopywritingResult(result);
     } catch {
-      // Mock result
+      // Mock result — 区分三个 stage
+      const stageContent = {
+        before: `🔥 即将开始，快来报名吧！名额有限，先到先得～\n\n🎯 活动亮点提前看：\n✅ 专业组织，体验满分\n✅ 名额有限，报满即止\n\n👇 点击下方链接立即报名，锁定你的名额！`,
+        during: `📸 现场直击！活动正在进行中，氛围超棒！\n\n来看现场发回的精彩瞬间——\n大家热情高涨，欢声笑语不断🎉\n\n还没来的朋友，关注我们不错过下一场！`,
+        after: `🎊 活动圆满结束！感谢每一位参与者的热情投入！\n\n📊 活动成果：\n✅ 参与人数爆满\n✅ 好评如潮\n✅ 精彩瞬间满满\n\n感谢相遇，期待下次再见！👋`,
+      };
       const mockResult: Copywriting = {
         id: Date.now(),
         event_id: eventId,
         user_id: user?.id || 1,
         platform: copyPlatform,
-        content: `🎉 ${event?.title || '精彩活动'}来了！\n\n${copyStage === 'before' ? '即将开始，快来报名吧！名额有限，先到先得～' : '活动圆满结束，感谢每一位参与者的支持！期待下次再聚！'}\n\n📍 ${event?.location_name || '待定'}\n🕐 ${event ? new Date(event.start_time).toLocaleString('zh-CN') : ''}\n\n#活动 #益屿`,
+        content: `🎉 ${event?.title || '精彩活动'}来了！\n\n${stageContent[copyStage as keyof typeof stageContent] || stageContent.before}\n\n📍 ${event?.location_name || '待定'}\n🕐 ${event ? new Date(event.start_time).toLocaleString('zh-CN') : ''}\n\n#活动 #益屿`,
         stage: copyStage,
         created_at: new Date().toISOString(),
       };
