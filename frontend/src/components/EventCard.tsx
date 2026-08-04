@@ -49,6 +49,18 @@ function EventCardBase({ event }: EventCardProps) {
             {event.price === 0 ? '免费' : `¥${event.price}`}
           </span>
         </div>
+        {/* Status badge */}
+        <div className="absolute bottom-3 left-3">
+          {event.status === 'published' || event.status === 'ongoing' ? (
+            <span className="tag bg-green-500 text-white text-xs font-medium shadow-sm">
+              开放报名
+            </span>
+          ) : (
+            <span className="tag bg-gray-400/80 text-white text-xs font-medium shadow-sm">
+              未开放报名
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Content */}
