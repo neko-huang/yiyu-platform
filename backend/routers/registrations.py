@@ -147,13 +147,19 @@ async def approve_registration(
     if reg.status not in ("pending", "rejected"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="当前状态不允许审核通过")
 
+    # 加行锁重新查询 Event，防止并发审核时的竞态条件
+    result = await db.execute(
+        select(Event).where(Event.id == reg.event_id).with_for_update()
+    )
+    locked_event = result.scalar_one()
+
     # 审核通过时，检查是否超过人数上限
-    if event.max_participants and event.current_participants >= event.max_participants:
+    if locked_event.max_participants and locked_event.current_participants >= locked_event.max_participants:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="活动报名人数已满，无法通过更多审核")
 
     reg.status = "approved"
     # 维护 current_participants 计数器（仅统计 approved + checked_in）
-    event.current_participants += 1
+    locked_event.current_participants += 1
     await db.flush()
     await db.refresh(reg)
     return RegistrationOut.model_validate(reg)
@@ -194,12 +200,12 @@ async def checkin_registration(
     await db.flush()
     await db.refresh(reg)
 
-    # 签到送积分
+    # 签到送积分（积分应发给报名参与者，而非操作签到的组织者）
     await award_points(
-        db, current_user.id, POINTS_CHECKIN, "checkin",
-        f"签到活动：{event.title}", event_id,
+        db, reg.user_id, POINTS_CHECKIN, "checkin",
+        f"签到活动：{event.title}", event.id,
     )
-    await check_and_unlock_achievements(db, current_user.id)
+    await check_and_unlock_achievements(db, reg.user_id)
     await db.commit()
 
     return RegistrationOut.model_validate(reg)
@@ -228,7 +234,7 @@ async def list_my_registrations(
     """获取当前用户报名（含已通过/已签到）的活动列表"""
     base_query = (
         select(Registration)
-        .options(selectinload(Registration.event))
+        .options(selectinload(Registration.event).selectinload(Event.organizer))
         .where(Registration.user_id == current_user.id)
         .order_by(Registration.created_at.desc())
     )

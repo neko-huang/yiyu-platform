@@ -66,6 +66,17 @@ async def _save_upload(
             detail="文件内容为空",
         )
 
+    # 文件头（magic bytes）校验，防止 Content-Type 伪造
+    if file.content_type == "image/png":
+        if content[:4] != b"\x89PNG":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="文件内容与声明类型不匹配 (PNG)")
+    elif file.content_type == "image/jpeg":
+        if content[:3] != b"\xff\xd8\xff":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="文件内容与声明类型不匹配 (JPEG)")
+    elif file.content_type == "image/webp":
+        if len(content) < 12 or content[:4] != b"RIFF" or content[8:12] != b"WEBP":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="文件内容与声明类型不匹配 (WebP)")
+
     # 生成唯一文件名并保存
     ext = CONTENT_TYPE_EXT_MAP.get(file.content_type, ".jpg")
     filename = f"{uuid.uuid4().hex}{ext}"

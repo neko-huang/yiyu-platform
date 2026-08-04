@@ -35,6 +35,10 @@ async def create_album(
     """为活动创建相册"""
     event = await get_event_or_404(event_id, db)
 
+    # 仅活动组织者可创建相册
+    if event.organizer_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="仅活动组织者可创建相册")
+
     album = Album(
         event_id=event_id,
         user_id=current_user.id,

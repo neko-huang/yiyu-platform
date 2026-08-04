@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from config import logger
+from config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, logger
 from database import get_db
 from models import AIPlan, User
 from routers.dependencies import get_current_user
@@ -29,11 +29,10 @@ async def generate_plan(
     try:
         # 兼容前端 prompt 字段，也支持 idea 字段
         user_input = payload.prompt or payload.idea
-        api_key = payload.api_key or None
-        base_url = payload.base_url or None
+        # 安全：忽略前端传入的 api_key/base_url，强制使用服务端配置
         content = await generate_event_plan(
             user_input, payload.mode,
-            api_key=api_key, base_url=base_url,
+            api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL,
             city=payload.city,
             messages=payload.messages,
             edited_plan=payload.edited_plan,
