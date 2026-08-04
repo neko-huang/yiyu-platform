@@ -143,10 +143,16 @@ export default function AIPlan() {
 
     const MAX_RETRIES = 2;
     const RETRY_DELAY = 1500;
-    const payload: Record<string, string> = { prompt: userMessage };
+    const payload: Record<string, any> = { prompt: userMessage };
     if (apiKey) payload.api_key = apiKey;
     if (baseUrl) payload.base_url = baseUrl;
     if (city) payload.city = city;
+    // 传递对话历史（排除首次的 system 欢迎语，从第一条用户消息开始）
+    const historyMessages = updatedMessages.map((m) => ({
+      role: m.role,
+      content: m.content,
+    }));
+    payload.messages = historyMessages;
 
     let lastError: unknown = null;
 

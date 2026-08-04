@@ -13,6 +13,7 @@ class AIPlanGenerateRequest(BaseModel):
     api_key: str | None = None
     base_url: str | None = None
     city: str | None = Field(None, max_length=100, description="用户所在城市")
+    messages: list[dict] | None = Field(None, description="对话历史，用于多轮对话上下文")
 
 
 class AIPlanGenerateResponse(BaseModel):
