@@ -332,4 +332,8 @@ export async function getMyEvents(): Promise<SearchResult> {
 export async function getMyRegistrations(): Promise<{ total: number; page: number; page_size: number; items: MyRegistration[] }> {
   const res = await client.get('/my/registrations');
   return res.data;
+}/** 更新用户信息（含社交账号绑定） */
+export async function updateUserInfo(data: { display_name?: string; social_media?: Record<string, string> }): Promise<User> {
+  const res = await client.put<User>('/auth/me', data);
+  return res.data;
 }

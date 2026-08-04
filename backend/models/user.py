@@ -20,6 +20,7 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(20), default="user", nullable=False)  # user / admin
     tags: Mapped[list] = mapped_column(JSON, default=list)
     avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    social_media: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # {"platform": "handle", ...}
 
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())

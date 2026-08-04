@@ -7,6 +7,7 @@ import {
   addInterest,
   removeInterest,
   uploadAvatar,
+  updateUserInfo,
 } from '../api/client';
 import type { Profile as ProfileData, UpdateProfileRequest } from '../types';
 import { getErrorMessage } from '../utils/errors';
@@ -53,6 +54,11 @@ export default function ProfilePage() {
   const [newTag, setNewTag] = useState('');
   const [tagSaving, setTagSaving] = useState(false);
 
+  // 社交账号
+  const [socialForm, setSocialForm] = useState<Record<string, string>>({});
+  const [socialSaving, setSocialSaving] = useState(false);
+  const [socialMsg, setSocialMsg] = useState('');
+
   // 头像上传
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
@@ -79,6 +85,10 @@ export default function ProfilePage() {
         birthday: data.birthday,
         city: data.city,
       });
+      // 初始化社交账号表单
+      if (user?.social_media) {
+        setSocialForm(user.social_media);
+      }
     } catch (err) {
       // 后端未启动 — 使用 AuthContext 信息构建 fallback
       if (user) {
@@ -93,6 +103,9 @@ export default function ProfilePage() {
           birthday: '',
           city: '',
         });
+        if (user.social_media) {
+          setSocialForm(user.social_media);
+        }
       } else {
         setError(getErrorMessage(err, '获取画像失败'));
       }
@@ -183,6 +196,29 @@ export default function ProfilePage() {
       }
     } finally {
       setTagSaving(false);
+    }
+  };
+
+  // ===== 社交账号 =====
+  const handleSaveSocial = async () => {
+    setSocialSaving(true);
+    setSocialMsg('');
+    try {
+      // 过滤掉空值
+      const cleaned: Record<string, string> = {};
+      for (const [key, val] of Object.entries(socialForm)) {
+        if (val.trim()) cleaned[key] = val.trim();
+      }
+      const updatedUser = await updateUserInfo({
+        social_media: Object.keys(cleaned).length > 0 ? cleaned : null,
+      });
+      updateUser(updatedUser);
+      setSocialMsg('✅ 社交账号保存成功');
+      setTimeout(() => setSocialMsg(''), 3000);
+    } catch {
+      setSocialMsg('❌ 保存失败，请重试');
+    } finally {
+      setSocialSaving(false);
     }
   };
 
@@ -556,6 +592,49 @@ export default function ProfilePage() {
               添加
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* ===== 社交账号绑定 ===== */}
+      <div className="card p-6 mb-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+          <span>🔗</span> 社交账号
+        </h2>
+        <p className="text-sm text-gray-500 mb-4">绑定社交账号后，积分排行将显示你的社媒身份</p>
+
+        <div className="space-y-3">
+          {[
+            { key: 'xiaohongshu', label: '小红书', icon: '📕', placeholder: '小红书号 / 昵称' },
+            { key: 'weibo', label: '微博', icon: '📱', placeholder: '微博昵称' },
+            { key: 'douyin', label: '抖音', icon: '🎵', placeholder: '抖音号' },
+            { key: 'bilibili', label: 'B站', icon: '📺', placeholder: 'B站UID / 昵称' },
+          ].map(({ key, label, icon, placeholder }) => (
+            <div key={key} className="flex items-center gap-3">
+              <span className="text-lg w-8 text-center">{icon}</span>
+              <span className="text-sm text-gray-600 w-16 flex-shrink-0">{label}</span>
+              <input
+                type="text"
+                value={socialForm[key as keyof typeof socialForm] || ''}
+                onChange={(e) => setSocialForm({ ...socialForm, [key]: e.target.value })}
+                className="input-field flex-1"
+                placeholder={placeholder}
+              />
+            </div>
+          ))}
+          <div className="flex gap-3 pt-2">
+            <button
+              onClick={handleSaveSocial}
+              disabled={socialSaving}
+              className="btn-primary text-sm"
+            >
+              {socialSaving ? '保存中...' : '💾 保存社交账号'}
+            </button>
+          </div>
+          {socialMsg && (
+            <p className={`text-sm ${socialMsg.includes('成功') ? 'text-green-600' : 'text-red-500'}`}>
+              {socialMsg}
+            </p>
+          )}
         </div>
       </div>
 

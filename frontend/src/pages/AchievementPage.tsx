@@ -31,11 +31,11 @@ const mockPointsSummary: PointsSummary = {
 };
 
 const mockLeaderboard = [
-  { user_id: 3, username: 'climber', display_name: '攀岩达人', total_points: 2450, rank: 1 },
-  { user_id: 5, username: 'event_master', display_name: '活动达人', total_points: 2100, rank: 2 },
-  { user_id: 1, username: 'hiker01', display_name: '山间行者', total_points: 1280, rank: 3 },
-  { user_id: 11, username: 'nature_lover', display_name: '自然之友', total_points: 980, rank: 4 },
-  { user_id: 12, username: 'photo_fan', display_name: '摄影爱好者', total_points: 750, rank: 5 },
+  { user_id: 3, username: 'climber', display_name: '攀岩达人', social_media: { xiaohongshu: '攀岩日记' }, total_points: 2450, rank: 1 },
+  { user_id: 5, username: 'event_master', display_name: '活动达人', social_media: null, total_points: 2100, rank: 2 },
+  { user_id: 1, username: 'hiker01', display_name: '山间行者', social_media: { weibo: '山间行者' }, total_points: 1280, rank: 3 },
+  { user_id: 11, username: 'nature_lover', display_name: '自然之友', social_media: null, total_points: 980, rank: 4 },
+  { user_id: 12, username: 'photo_fan', display_name: '摄影爱好者', social_media: { xiaohongshu: '摄影爱好者' }, total_points: 750, rank: 5 },
 ];
 
 export default function AchievementPage() {
@@ -129,6 +129,40 @@ export default function AchievementPage() {
         <div className="flex items-center gap-4 mt-4 text-sm text-white/70">
           <span>🏅 已解锁 {earnedIds.size} / {achievements.length} 成就</span>
           <span>📊 排名第 {leaderboard.find((l) => l.user_id === 1)?.rank || '-'} 名</span>
+        </div>
+      </div>
+
+      {/* Points Guide */}
+      <div className="card p-5 mb-6 bg-amber-50 border border-amber-200">
+        <h3 className="font-semibold text-amber-800 text-sm mb-3 flex items-center gap-2">
+          <span>💡</span> 如何获取积分？
+        </h3>
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-sm">
+          <div className="text-center p-2 bg-white rounded-lg">
+            <div className="text-lg mb-1">📝</div>
+            <div className="font-medium text-amber-900">+50</div>
+            <div className="text-amber-700 text-xs">报名活动</div>
+          </div>
+          <div className="text-center p-2 bg-white rounded-lg">
+            <div className="text-lg mb-1">✅</div>
+            <div className="font-medium text-amber-900">+100</div>
+            <div className="text-amber-700 text-xs">签到活动</div>
+          </div>
+          <div className="text-center p-2 bg-white rounded-lg">
+            <div className="text-lg mb-1">📅</div>
+            <div className="font-medium text-amber-900">+200</div>
+            <div className="text-amber-700 text-xs">创建活动</div>
+          </div>
+          <div className="text-center p-2 bg-white rounded-lg">
+            <div className="text-lg mb-1">📸</div>
+            <div className="font-medium text-amber-900">+10</div>
+            <div className="text-amber-700 text-xs">上传照片</div>
+          </div>
+          <div className="text-center p-2 bg-white rounded-lg">
+            <div className="text-lg mb-1">✍️</div>
+            <div className="font-medium text-amber-900">+30</div>
+            <div className="text-amber-700 text-xs">写活动复盘</div>
+          </div>
         </div>
       </div>
 
@@ -258,7 +292,13 @@ export default function AchievementPage() {
                           </div>
                           <div>
                             <p className="font-medium text-gray-900 text-sm">{entry.display_name}</p>
-                            <p className="text-xs text-gray-400">@{entry.username}</p>
+                            {entry.social_media && Object.entries(entry.social_media).length > 0 ? (
+                              <p className="text-xs text-gray-400">
+                                {Object.entries(entry.social_media).map(([platform, handle]) => (
+                                  <span key={platform}>{platform === 'xiaohongshu' ? '📕' : platform === 'weibo' ? '📱' : '🌐'} {handle}</span>
+                                ))}
+                              </p>
+                            ) : null}
                           </div>
                         </div>
                       </td>

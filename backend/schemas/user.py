@@ -20,6 +20,7 @@ class UserUpdate(BaseModel):
     display_name: str | None = None
     avatar_url: str | None = None
     tags: list[str] | None = None
+    social_media: dict | None = None  # {"xiaohongshu": "xxx", "weibo": "xxx", ...}
 
 
 class UserOut(BaseModel):
@@ -30,6 +31,7 @@ class UserOut(BaseModel):
     role: str = "user"
     tags: list = []
     avatar_url: str | None = None
+    social_media: dict | None = None
     created_at: datetime | None = None
 
     model_config = {"from_attributes": True}

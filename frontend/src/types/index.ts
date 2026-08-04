@@ -6,6 +6,7 @@ export interface User {
   role: 'user' | 'admin';
   tags: string[];
   avatar_url?: string;
+  social_media?: Record<string, string> | null;
 }
 
 export interface Event {

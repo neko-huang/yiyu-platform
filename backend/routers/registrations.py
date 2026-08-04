@@ -19,6 +19,7 @@ from schemas.registration import (
     RegistrationOut,
     RegistrationWithUserOut,
 )
+from services.points import award_points, check_and_unlock_achievements, POINTS_REGISTER, POINTS_CHECKIN
 
 router = APIRouter(tags=["报名"])
 
@@ -62,11 +63,21 @@ async def register_for_event(
         form_data=payload.form_data if payload else {},
     )
     db.add(reg)
-    # 更新活动参与人数
     event.current_participants += 1
+    await db.flush()
+    await db.refresh(reg)
+
+    # 报名成功送积分
+    await award_points(
+        db, current_user.id, POINTS_REGISTER, "register",
+        f"报名活动：{event.title}", event_id,
+    )
+    await check_and_unlock_achievements(db, current_user.id)
+
     await db.commit()
     await db.refresh(reg)
-    logger.info("用户 %s 报名活动 %s（当前 %s 人）", current_user.id, event_id, event.current_participants)
+    logger.info("用户 %s 报名活动 %s（当前 %s 人），获得 %s 积分",
+                current_user.id, event_id, event.current_participants, POINTS_REGISTER)
     return RegistrationOut.model_validate(reg)
 
 
@@ -182,6 +193,15 @@ async def checkin_registration(
     reg.checked_in_at = datetime.now(timezone.utc)
     await db.flush()
     await db.refresh(reg)
+
+    # 签到送积分
+    await award_points(
+        db, current_user.id, POINTS_CHECKIN, "checkin",
+        f"签到活动：{event.title}", event_id,
+    )
+    await check_and_unlock_achievements(db, current_user.id)
+    await db.commit()
+
     return RegistrationOut.model_validate(reg)
 
 

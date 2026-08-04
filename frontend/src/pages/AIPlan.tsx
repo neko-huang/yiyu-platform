@@ -284,48 +284,44 @@ export default function AIPlan() {
   return (
     <div className="h-[calc(100vh-4rem)] flex flex-col">
       {/* Header + Settings — 固定顶部不随滚动消失 */}
-      <div className="sticky top-0 z-10 bg-white">
-        <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <span className="text-2xl" aria-hidden="true">✨</span>
-              AI 活动策划助手
-            </h1>
-            <p className="text-xs text-gray-500 mt-0.5">智能生成专业活动方案，让策划变得简单</p>
-          </div>
-          <div className="flex gap-2 items-center">
-            {errorMsg && (
-              <span className={`text-sm ${errorMsg.includes('已保存') || errorMsg.includes('已设置') ? 'text-green-600' : 'text-red-500'}`}>
-                {errorMsg}
-              </span>
-            )}
-            <button onClick={() => setShowSettings(!showSettings)} className="btn-secondary text-sm">
-              ⚙️ 设置
-            </button>
-            <button onClick={clearChat} className="btn-secondary text-sm">
-              🗑️ 清空对话
-            </button>
-            <button onClick={handleSavePlan} disabled={!currentPlan} className="btn-secondary text-sm">
-              💾 保存方案
-            </button>
-            <button onClick={handleConvertToEvent} disabled={!currentPlan} className="btn-primary text-sm">
-              📋 转化为活动
-            </button>
+      <div className="sticky top-0 z-10 bg-white border-b border-gray-200">
+        {/* Header bar */}
+        <div className="px-6 py-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <span className="text-2xl" aria-hidden="true">✨</span>
+                AI 活动策划助手
+              </h1>
+              <p className="text-xs text-gray-500 mt-0.5">智能生成专业活动方案，让策划变得简单</p>
+            </div>
+            <div className="flex gap-2 items-center">
+              {errorMsg && (
+                <span className={`text-sm ${errorMsg.includes('已保存') || errorMsg.includes('已设置') ? 'text-green-600' : 'text-red-500'}`}>
+                  {errorMsg}
+                </span>
+              )}
+              <button onClick={() => setShowSettings(!showSettings)} className="btn-secondary text-sm">
+                ⚙️ 设置
+              </button>
+              <button onClick={clearChat} className="btn-secondary text-sm">
+                🗑️ 清空对话
+              </button>
+              <button onClick={handleSavePlan} disabled={!currentPlan} className="btn-secondary text-sm">
+                💾 保存方案
+              </button>
+              <button onClick={handleConvertToEvent} disabled={!currentPlan} className="btn-primary text-sm">
+                📋 转化为活动
+              </button>
+            </div>
           </div>
         </div>
-        </div>
-      </div>
 
-      {/* Settings panel */}
-      {showSettings && (
-        <div className="bg-amber-50 border-b border-amber-200 px-6 py-4">
+        {/* Settings — 可折叠，展开时固定不滚动 */}
+        {showSettings && (
+        <div className="bg-amber-50 border-t border-amber-200 px-6 py-3">
           <div className="max-w-3xl mx-auto">
-            <h3 className="text-sm font-semibold text-amber-800 mb-3">⚙️ DeepSeek API 配置</h3>
-            <p className="text-xs text-amber-600 mb-3">
-              配置你自己的 DeepSeek API Key，AI 策划将使用你的额度生成真实方案。留空则使用模拟数据。
-            </p>
-            <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex flex-col sm:flex-row gap-2 items-end">
               <div className="flex-1">
                 <label className="block text-xs font-medium text-amber-700 mb-1">API Key</label>
                 <input
@@ -336,7 +332,7 @@ export default function AIPlan() {
                   placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                 />
               </div>
-              <div className="flex-1">
+              <div className="w-28">
                 <label className="block text-xs font-medium text-amber-700 mb-1">Base URL</label>
                 <input
                   type="text"
@@ -346,14 +342,14 @@ export default function AIPlan() {
                   placeholder="https://api.deepseek.com"
                 />
               </div>
-              <div className="flex-1">
-                <label className="block text-xs font-medium text-amber-700 mb-1">所在城市</label>
+              <div className="w-24">
+                <label className="block text-xs font-medium text-amber-700 mb-1">城市</label>
                 <input
                   type="text"
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
                   className="input-field text-sm"
-                  placeholder="如：上海、北京"
+                  placeholder="上海"
                 />
               </div>
               <div className="flex items-end">
@@ -364,7 +360,8 @@ export default function AIPlan() {
             </div>
           </div>
         </div>
-      )}
+        )}
+      </div>
 
       <div className="flex-1 flex overflow-hidden">
         {/* Chat area */}

@@ -37,12 +37,26 @@ class ManualPointsInput(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# 创建成就定义（管理员用）
+# ---------------------------------------------------------------------------
+class AchievementCreate(BaseModel):
+    name: str
+    description: str | None = None
+    icon: str = "🏅"
+    condition_type: str
+    condition_value: int
+    is_limited: bool = False
+
+
+# ---------------------------------------------------------------------------
 # 排行榜条目
 # ---------------------------------------------------------------------------
 class LeaderboardEntry(BaseModel):
     user_id: int
     display_name: str
+    username: str
     avatar_url: str | None = None
+    social_media: dict | None = None
     total_points: int
     rank: int
 
@@ -61,6 +75,32 @@ async def list_achievements(
     """获取所有成就定义"""
     result = await db.execute(select(Achievement).order_by(Achievement.id))
     return [AchievementOut.model_validate(a) for a in result.scalars().all()]
+
+
+@router.post(
+    "/achievements",
+    response_model=AchievementOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_achievement(
+    payload: AchievementCreate,
+    admin: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """管理员创建成就定义"""
+    ach = Achievement(
+        name=payload.name,
+        description=payload.description,
+        icon=payload.icon,
+        condition_type=payload.condition_type,
+        condition_value=payload.condition_value,
+        is_limited=payload.is_limited,
+    )
+    db.add(ach)
+    await db.flush()
+    await db.refresh(ach)
+    logger.info("管理员 %s 创建成就定义: %s", admin.id, ach.name)
+    return AchievementOut.model_validate(ach)
 
 
 @router.get(
@@ -217,7 +257,9 @@ async def get_leaderboard(
         entries.append({
             "user_id": user.id,
             "display_name": user.display_name or user.username,
+            "username": user.username,
             "avatar_url": user.avatar_url,
+            "social_media": user.social_media,
             "total_points": total,
         })
 
@@ -231,7 +273,9 @@ async def get_leaderboard(
             LeaderboardEntry(
                 user_id=entry["user_id"],
                 display_name=entry["display_name"],
+                username=entry["username"],
                 avatar_url=entry["avatar_url"],
+                social_media=entry["social_media"],
                 total_points=entry["total_points"],
                 rank=rank,
             )

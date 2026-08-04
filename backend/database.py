@@ -45,4 +45,17 @@ async def init_db():
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+    # 迁移：添加 social_media 列到 users 表（兼容已有数据库）
+    async with engine.begin() as conn:
+        def _add_column(conn):
+            import sqlalchemy as sa
+            from sqlalchemy import inspect
+            inspector = inspect(conn)
+            columns = [c["name"] for c in inspector.get_columns("users")]
+            if "social_media" not in columns:
+                conn.execute(sa.text("ALTER TABLE users ADD COLUMN social_media JSON"))
+                logger.info("迁移：users 表添加 social_media 列")
+        await conn.run_sync(_add_column)
+
     logger.info("数据库表已就绪")
