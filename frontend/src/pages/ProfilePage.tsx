@@ -564,8 +564,8 @@ export default function ProfilePage() {
         <Link to="/" className="card p-5 hover:shadow-md transition-shadow flex items-center gap-4">
           <div className="w-12 h-12 rounded-lg bg-primary-50 flex items-center justify-center text-2xl">📅</div>
           <div>
-            <h3 className="font-medium text-gray-900">我的活动</h3>
-            <p className="text-sm text-gray-400">查看组织和参与的活动</p>
+            <h3 className="font-medium text-gray-900">浏览全部活动</h3>
+            <p className="text-sm text-gray-400">发现更多精彩活动</p>
           </div>
         </Link>
         <Link to="/events/create" className="card p-5 hover:shadow-md transition-shadow flex items-center gap-4">

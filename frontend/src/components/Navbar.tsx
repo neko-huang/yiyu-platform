@@ -173,11 +173,11 @@ export default function Navbar() {
                       <span>👤</span> 个人中心
                     </Link>
                     <Link
-                      to="/profile"
+                      to="/"
                       className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                       role="menuitem"
                     >
-                      <span>📅</span> 我的活动
+                      <span>📅</span> 全部活动
                     </Link>
                     <Link
                       to="/search"

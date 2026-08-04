@@ -51,16 +51,19 @@ async def register_for_event(
     if event.max_participants and event.current_participants >= event.max_participants:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="活动报名人数已满")
 
+    # MVP 阶段：自动通过报名，无需审核
     reg = Registration(
         event_id=event_id,
         user_id=current_user.id,
-        status="pending",
+        status="approved",
         form_data=payload.form_data,
     )
     db.add(reg)
+    # 更新活动参与人数
+    event.current_participants += 1
     await db.flush()
     await db.refresh(reg)
-    logger.info("用户 %s 报名活动 %s", current_user.id, event_id)
+    logger.info("用户 %s 报名活动 %s（当前 %s 人）", current_user.id, event_id, event.current_participants)
     return RegistrationOut.model_validate(reg)
 
 
