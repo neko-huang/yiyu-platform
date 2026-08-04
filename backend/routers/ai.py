@@ -31,7 +31,11 @@ async def generate_plan(
         user_input = payload.prompt or payload.idea
         api_key = payload.api_key or None
         base_url = payload.base_url or None
-        content = await generate_event_plan(user_input, payload.mode, api_key=api_key, base_url=base_url)
+        content = await generate_event_plan(
+            user_input, payload.mode,
+            api_key=api_key, base_url=base_url,
+            city=payload.city,
+        )
     except httpx.HTTPStatusError as e:
         logger.warning("AI 服务返回错误: %s", e.response.status_code)
         raise HTTPException(

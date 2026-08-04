@@ -12,6 +12,7 @@ class AIPlanGenerateRequest(BaseModel):
     prompt: str | None = None
     api_key: str | None = None
     base_url: str | None = None
+    city: str | None = Field(None, max_length=100, description="用户所在城市")
 
 
 class AIPlanGenerateResponse(BaseModel):
