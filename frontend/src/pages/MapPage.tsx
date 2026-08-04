@@ -52,7 +52,14 @@ export default function MapPage() {
             </div>
           ) : (
             <div className="relative w-full h-full">
-              <MapView events={events} center={[35.86166, 104.195397]} zoom={4} height="100%" interactive />
+              <MapView
+              events={events}
+              center={[35.86166, 104.195397]}
+              zoom={4}
+              height="100%"
+              interactive
+              focusedEventId={selectedEvent?.id ?? null}
+            />
               {events.length === 0 && (
                 <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 bg-white/90 backdrop-blur-sm rounded-lg shadow-lg px-4 py-2 text-sm text-gray-500">
                   暂无活动，地图上未显示标记

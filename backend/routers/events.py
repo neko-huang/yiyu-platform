@@ -26,6 +26,7 @@ from schemas.event import (
     RecommendationItem,
     RecommendationListOut,
 )
+from services.points import award_points, check_and_unlock_achievements, POINTS_CREATE_EVENT
 
 router = APIRouter(prefix="/events", tags=["活动"])
 
@@ -378,7 +379,17 @@ async def create_event(
     db.add(event)
     await db.flush()
     await db.refresh(event)
-    logger.info("用户 %s 创建活动 %s", current_user.id, event.id)
+
+    # 创建活动送积分
+    await award_points(
+        db, current_user.id, POINTS_CREATE_EVENT, "create_event",
+        f"创建活动：{event.title}", event.id,
+    )
+    await check_and_unlock_achievements(db, current_user.id)
+
+    await db.commit()
+    await db.refresh(event)
+    logger.info("用户 %s 创建活动 %s，获得 %s 积分", current_user.id, event.id, POINTS_CREATE_EVENT)
     return EventOut.model_validate(event)
 
 

@@ -16,6 +16,7 @@ from schemas.album import (
     AlbumPhotoCreate,
     AlbumPhotoOut,
 )
+from services.points import award_points, check_and_unlock_achievements, POINTS_PHOTO
 
 router = APIRouter(tags=["回忆相册"])
 
@@ -110,7 +111,17 @@ async def add_photo(
     db.add(photo)
     await db.flush()
     await db.refresh(photo)
-    logger.info("用户 %s 向相册 %s 添加照片 %s", current_user.id, album_id, photo.id)
+
+    # 上传照片送积分
+    await award_points(
+        db, current_user.id, POINTS_PHOTO, "upload_photo",
+        f"上传照片：{photo.caption or '活动照片'}", album.event_id,
+    )
+    await check_and_unlock_achievements(db, current_user.id)
+
+    await db.commit()
+    await db.refresh(photo)
+    logger.info("用户 %s 向相册 %s 添加照片 %s，获得 %s 积分", current_user.id, album_id, photo.id, POINTS_PHOTO)
     return AlbumPhotoOut.model_validate(photo)
 
 

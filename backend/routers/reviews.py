@@ -9,6 +9,7 @@ from database import get_db
 from models import Event, EventReview, User
 from routers.dependencies import check_organizer, get_current_user, get_event_or_404
 from schemas.review import ReviewCreate, ReviewUpdate, ReviewOut, ReviewListOut
+from services.points import award_points, check_and_unlock_achievements, POINTS_REVIEW
 
 router = APIRouter(prefix="/reviews", tags=["活动复盘"])
 
@@ -52,7 +53,17 @@ async def create_review(
     db.add(review)
     await db.flush()
     await db.refresh(review)
-    logger.info("用户 %s 为活动 %s 创建复盘报告 %s", current_user.id, event_id, review.id)
+
+    # 创建复盘送积分
+    await award_points(
+        db, current_user.id, POINTS_REVIEW, "create_review",
+        f"创建活动复盘：{event_id}", event_id,
+    )
+    await check_and_unlock_achievements(db, current_user.id)
+
+    await db.commit()
+    await db.refresh(review)
+    logger.info("用户 %s 为活动 %s 创建复盘报告 %s，获得 %s 积分", current_user.id, event_id, review.id, POINTS_REVIEW)
     return ReviewOut.model_validate(review)
 
 

@@ -25,19 +25,19 @@ interface FormData {
 export default function CreateEvent() {
   const navigate = useNavigate();
 
-  // 读取存储的 AI 方案数据
-  const readAIPlanData = () => {
+  // 读取存储的 AI 方案数据（只读不删，避免 React Strict Mode 双调用问题）
+  const peekAIPlanData = () => {
     let data = sessionStorage.getItem('aiPlanData');
     if (!data) data = localStorage.getItem('aiPlanData');
     if (data) {
-      try {
-        const parsed = JSON.parse(data);
-        sessionStorage.removeItem('aiPlanData');
-        localStorage.removeItem('aiPlanData');
-        return parsed;
-      } catch { /* ignore */ }
+      try { return JSON.parse(data); } catch { /* ignore */ }
     }
     return null;
+  };
+  const clearAIPlanData = () => {
+    sessionStorage.removeItem('aiPlanData');
+    localStorage.removeItem('aiPlanData');
+    sessionStorage.removeItem('aiPlanContent');
   };
 
   const [formData, setFormData] = useState<FormData>(() => {
@@ -47,7 +47,7 @@ export default function CreateEvent() {
     let aiCategory = '';
     let aiMaxParticipants = 50;
 
-    const aiData = readAIPlanData();
+    const aiData = peekAIPlanData();
     if (aiData) {
       aiTitle = aiData.title || '';
       aiDescription = aiData.description || '';
@@ -60,7 +60,6 @@ export default function CreateEvent() {
       const aiPlan = sessionStorage.getItem('aiPlanContent');
       if (aiPlan) {
         aiDescription = aiPlan;
-        sessionStorage.removeItem('aiPlanContent');
       }
     }
 
@@ -69,7 +68,7 @@ export default function CreateEvent() {
     if (sopRaw) {
       try {
         sopData = JSON.parse(sopRaw);
-        sessionStorage.removeItem('sopTemplateContent');
+        // 不在 init 中删除，避免 Strict Mode 双调用问题，由 useEffect 清理
       } catch { /* ignore */ }
     }
 
@@ -104,7 +103,7 @@ export default function CreateEvent() {
   }, [showAIModal, closeModal]);
 
   useEffect(() => {
-    const aiData = readAIPlanData();
+    const aiData = peekAIPlanData();
     if (aiData) {
       setFormData((prev) => ({
         ...prev,
@@ -115,6 +114,9 @@ export default function CreateEvent() {
         max_participants: aiData.max_participants || prev.max_participants,
       }));
     }
+    // 清理 storage，确保数据只用一次
+    clearAIPlanData();
+    sessionStorage.removeItem('sopTemplateContent');
   }, []);
 
   const handleChange = (field: keyof FormData, value: string | number) => {
@@ -131,28 +133,14 @@ export default function CreateEvent() {
     }));
   };
 
-  // ===== 地图点击 → 逆地理编码回填地点名称 =====
-  const handleMapClick = (lat: number, lng: number) => {
-    setFormData((prev) => ({ ...prev, latitude: lat, longitude: lng }));
-
-    const AMap = (window as any).AMap;
-    if (!AMap) return;
-
-    const geocoder = new AMap.Geocoder({ city: '北京', radius: 1000 });
-    geocoder.getAddress([lng, lat], (status: string, result: any) => {
-      if (status === 'complete' && result?.regeocode?.pois?.length) {
-        const nearest = result.regeocode.pois[0];
-        setFormData((prev) => ({ ...prev, location_name: nearest.name }));
-      } else if (status === 'complete' && result?.regeocode?.addressComponent) {
-        const addr = result.regeocode.addressComponent;
-        const name = [addr.district || '', addr.street || '', addr.streetNumber || '']
-          .filter(Boolean).join('');
-        setFormData((prev) => ({
-          ...prev,
-          location_name: name || result.regeocode.formattedAddress || '已选地点',
-        }));
-      }
-    });
+  // ===== 地图点击 → 使用 MapView 回传的地点名称 =====
+  const handleMapClick = (lat: number, lng: number, address?: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      latitude: lat,
+      longitude: lng,
+      location_name: address || prev.location_name || '已选地点',
+    }));
   };
 
   const handleSubmit = async (e: FormEvent) => {

@@ -43,16 +43,17 @@ export default function LocationSearch({ value, onSelect, placeholder }: Locatio
       version: '2.0',
       plugins: ['AMap.AutoComplete', 'AMap.PlaceSearch', 'AMap.Geocoder'],
     }).then((AMap) => {
-      autoCompleteRef.current = new AMap.AutoComplete({ city: '北京', citylimit: true });
-      placeSearchRef.current = new AMap.PlaceSearch({ city: '北京', pageSize: 5 });
+      // 不限制城市，全国范围搜索
+      autoCompleteRef.current = new AMap.AutoComplete({ city: '', citylimit: false });
+      placeSearchRef.current = new AMap.PlaceSearch({ city: '', pageSize: 5 });
       setReady(true);
     }).catch((err) => {
       // AMapLoader 可能已加载过但插件不全，尝试用 AMap.plugin 动态加载
       if ((window as any).AMap) {
         const AMap = (window as any).AMap;
         AMap.plugin(['AMap.AutoComplete', 'AMap.PlaceSearch', 'AMap.Geocoder'], () => {
-          autoCompleteRef.current = new AMap.AutoComplete({ city: '北京', citylimit: true });
-          placeSearchRef.current = new AMap.PlaceSearch({ city: '北京', pageSize: 5 });
+          autoCompleteRef.current = new AMap.AutoComplete({ city: '', citylimit: false });
+          placeSearchRef.current = new AMap.PlaceSearch({ city: '', pageSize: 5 });
           setReady(true);
         });
       } else {

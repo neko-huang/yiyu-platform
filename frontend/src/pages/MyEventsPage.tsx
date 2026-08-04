@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { getMyEvents, getMyRegistrations } from '../api/client';
+import { useAuth } from '../contexts/AuthContext';
 import type { Event, MyRegistration } from '../types';
 
 type Tab = 'created' | 'registered';
 
 export default function MyEventsPage() {
+  const { user } = useAuth();
   const [tab, setTab] = useState<Tab>('created');
 
   const [createdEvents, setCreatedEvents] = useState<Event[]>([]);
@@ -21,7 +23,11 @@ export default function MyEventsPage() {
     setCreatedError('');
     try {
       const data = await getMyEvents();
-      setCreatedEvents(data.items || []);
+      // 确保只显示当前用户创建的活动
+      const filtered = (data.items || []).filter(
+        (e) => e.organizer_id === user?.id
+      );
+      setCreatedEvents(filtered);
     } catch {
       setCreatedError('加载我创建的活动失败');
     } finally {

@@ -55,7 +55,7 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2 flex-shrink-0" aria-label="益屿首页">
-            <div className="w-9 h-9 bg-cyan-600 rounded-lg flex items-center justify-center">
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#1696C7' }}>
               <span className="text-white font-bold text-lg" style={{ fontFamily: "'Songti SC', 'SimSun', serif" }}>益</span>
             </div>
             <span className="text-xl font-bold text-gray-800 hidden sm:block">益屿</span>

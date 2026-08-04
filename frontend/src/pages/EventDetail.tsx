@@ -8,6 +8,23 @@ import { generateCopywriting } from '../api/client';
 import { statusLabels, getEventTypeLabel } from '../utils/constants';
 import { getErrorMessage } from '../utils/errors';
 
+// localStorage 模拟数据持久化
+function saveMockEventData(event: Event) {
+  try {
+    const key = `mockEvent_${event.id}`;
+    localStorage.setItem(key, JSON.stringify(event));
+  } catch { /* ignore */ }
+}
+
+function loadMockEventData(eventId: number): Event | null {
+  try {
+    const key = `mockEvent_${eventId}`;
+    const saved = localStorage.getItem(key);
+    if (saved) return JSON.parse(saved);
+  } catch { /* ignore */ }
+  return null;
+}
+
 // 模拟详情数据
 const mockEventDetail: Record<number, Event> = {
   1: {
@@ -80,8 +97,9 @@ export default function EventDetail() {
         setFinanceRecords(finRes.data?.items || finRes.data || []);
       }
     } catch {
-      // 使用模拟数据
-      const mockEvent = mockEventDetail[eventId];
+      // 优先使用 localStorage 持久化的模拟数据，再回退到硬编码模拟数据
+      const savedEvent = loadMockEventData(eventId);
+      const mockEvent = savedEvent || mockEventDetail[eventId];
       if (mockEvent) {
         setEvent(mockEvent);
         setRegistrations(mockRegistrations);
@@ -109,7 +127,10 @@ export default function EventDetail() {
       setRegistrationStatus(regStatus);
       // 更新报名人数
       if (event) {
-        setEvent({ ...event, current_participants: event.current_participants + 1 });
+        const updated = { ...event, current_participants: event.current_participants + 1 };
+        setEvent(updated);
+        // 持久化到 localStorage（后端未启动时兜底）
+        saveMockEventData(updated);
       }
     } catch (err) {
       // 检查是否为 409（已报名）或名额已满
@@ -123,7 +144,9 @@ export default function EventDetail() {
         // 后端未启动 - 模拟成功
         setRegistrationStatus('approved');
         if (event) {
-          setEvent({ ...event, current_participants: event.current_participants + 1 });
+          const updated = { ...event, current_participants: event.current_participants + 1 };
+          setEvent(updated);
+          saveMockEventData(updated);
         }
       }
     } finally {

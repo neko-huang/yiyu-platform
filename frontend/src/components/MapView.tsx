@@ -8,8 +8,9 @@ interface MapViewProps {
   zoom?: number;
   height?: string;
   singleMarker?: { lat: number; lng: number; title: string };
-  onMapClick?: (lat: number, lng: number) => void;
+  onMapClick?: (lat: number, lng: number, address?: string) => void;
   interactive?: boolean;
+  focusedEventId?: number | null;
 }
 
 export default function MapView({
@@ -20,6 +21,7 @@ export default function MapView({
   singleMarker,
   onMapClick,
   interactive = false,
+  focusedEventId,
 }: MapViewProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
@@ -56,9 +58,11 @@ export default function MapView({
 
       // 事件多点标记
       if (events.length > 0) {
-        const markers = events
+        const markers: any[] = [];
+        const markerMap: Record<number, { marker: any; infoWindow: any }> = {};
+        events
           .filter((e) => e.latitude && e.longitude)
-          .map((event) => {
+          .forEach((event) => {
             const marker = new AMap.Marker({
               position: [event.longitude, event.latitude],
               title: event.title,
@@ -77,10 +81,12 @@ export default function MapView({
               closeWhenClickMap: true,
             });
             marker.on('click', () => infoWindow.open(map, marker.getPosition()));
-            return marker;
+            markers.push(marker);
+            markerMap[event.id] = { marker, infoWindow };
           });
         map.add(markers);
-        markersRef.current = markers;
+        (markersRef as any).current = markers;
+        (window as any).__yiyuMarkerMap = markerMap;
         if (markers.length > 0) map.setFitView(markers, false, [60, 60, 60, 60]);
       }
 
@@ -96,10 +102,26 @@ export default function MapView({
         if (zoom < 10) map.setZoom(14);
       }
 
-      // 点击事件
+      // 点击事件 — 逆地理编码获取地点名称
       if (onMapClick) {
+        const geocoder = new AMap.Geocoder({ city: '', radius: 1000 });
         map.on('click', (e: any) => {
-          onMapClick(e.lnglat.getLat(), e.lnglat.getLng());
+          const lat = e.lnglat.getLat();
+          const lng = e.lnglat.getLng();
+          // 尝试逆地理编码获取地址名称
+          geocoder.getAddress([lng, lat], (status: string, result: any) => {
+            let address: string | undefined;
+            if (status === 'complete' && result?.regeocode) {
+              if (result.regeocode.pois?.length) {
+                address = result.regeocode.pois[0].name;
+              } else if (result.regeocode.addressComponent) {
+                const addr = result.regeocode.addressComponent;
+                address = [addr.district || '', addr.street || '', addr.streetNumber || '']
+                  .filter(Boolean).join('') || result.regeocode.formattedAddress;
+              }
+            }
+            onMapClick(lat, lng, address);
+          });
         });
       }
 
@@ -146,8 +168,23 @@ export default function MapView({
     if (map.getZoom() < 10) map.setZoom(14);
   }, [singleMarker]);
 
-  return (
-    <>
+  // 聚焦到指定事件标记
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !focusedEventId) return;
+
+    const markerMap = (window as any).__yiyuMarkerMap;
+    if (!markerMap || !markerMap[focusedEventId]) return;
+
+    const { marker, infoWindow } = markerMap[focusedEventId];
+    const pos = marker.getPosition();
+    map.setCenter(pos, true);
+    if (map.getZoom() < 13) map.setZoom(13);
+    // 关闭其他信息窗，打开当前
+    infoWindow.open(map, pos);
+  }, [focusedEventId]);
+
+  return (<>
       {mapError && (
         <div className="flex items-center justify-center bg-red-50 border border-red-200 rounded-xl p-6 text-center" style={{ height }}>
           <div>
