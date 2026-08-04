@@ -90,16 +90,38 @@ import type {
   PointsSummary,
 } from '../types';
 
+/** 将后端 UserProfileOut 响应转为前端 Profile 类型 */
+function transformProfile(d: any): Profile {
+  return {
+    user_id: d.user_id,
+    username: d.username || '',
+    display_name: d.display_name || '',
+    email: d.email || '',
+    avatar_url: d.avatar_url,
+    bio: d.bio || '',
+    gender: d.gender || '',
+    birthday: d.birth_date ? String(d.birth_date) : '',
+    city: d.location || '',
+    tags: d.interests || [],
+    stats: {
+      organized_count: d.activity_count || 0,
+      participated_count: d.participation_count || 0,
+      avg_rating: d.rating_avg || 0,
+    },
+  };
+}
+
+
 /** 获取当前用户画像 */
 export async function getProfile(): Promise<Profile> {
-  const res = await client.get<Profile>('/profiles/me');
-  return res.data;
+  const res = await client.get<any>('/profiles/me');
+  return transformProfile(res.data);
 }
 
 /** 更新当前用户画像 */
 export async function updateProfile(data: UpdateProfileRequest): Promise<Profile> {
-  const res = await client.put<Profile>('/profiles/me', data);
-  return res.data;
+  const res = await client.put<any>('/profiles/me', data);
+  return transformProfile(res.data);
 }
 
 /** 获取其他用户的公开画像 */
@@ -110,14 +132,14 @@ export async function getUserProfile(userId: number): Promise<PublicProfile> {
 
 /** 添加兴趣标签 */
 export async function addInterest(tag: string): Promise<Profile> {
-  const res = await client.post<Profile>('/profiles/me/interests', { tag });
-  return res.data;
+  const res = await client.post<any>('/profiles/me/interests', { tag });
+  return transformProfile(res.data);
 }
 
 /** 移除兴趣标签 */
 export async function removeInterest(tag: string): Promise<Profile> {
-  const res = await client.delete<Profile>(`/profiles/me/interests/${encodeURIComponent(tag)}`);
-  return res.data;
+  const res = await client.delete<any>(`/profiles/me/interests/${encodeURIComponent(tag)}`);
+  return transformProfile(res.data);
 }
 
 /** 上传头像（FormData） */

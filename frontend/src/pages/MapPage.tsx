@@ -60,16 +60,15 @@ export default function MapPage() {
             <div className="w-full h-full flex items-center justify-center bg-gray-100">
               <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary-200 border-t-primary-500" role="status" aria-label="加载中"></div>
             </div>
-          ) : events.length === 0 ? (
-            <div className="w-full h-full flex items-center justify-center bg-gray-100">
-              <div className="text-center">
-                <div className="text-5xl mb-3">🗺️</div>
-                <p className="text-gray-500 mb-4">暂无活动</p>
-                <button onClick={fetchEvents} className="btn-secondary">刷新</button>
-              </div>
-            </div>
           ) : (
-            <MapView events={events} center={[35.86166, 104.195397]} zoom={4} height="100%" interactive />
+            <div className="relative w-full h-full">
+              <MapView events={events} center={[35.86166, 104.195397]} zoom={4} height="100%" interactive />
+              {events.length === 0 && (
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 bg-white/90 backdrop-blur-sm rounded-lg shadow-lg px-4 py-2 text-sm text-gray-500">
+                  暂无活动，地图上未显示标记
+                </div>
+              )}
+            </div>
           )}
         </div>
 
