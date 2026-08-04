@@ -20,50 +20,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // 初始化：检查 localStorage 中的 token 是否有效
+  // 不自动登录，每次打开页面都需手动登录
+  // 每次刷新页面时清除旧 token，确保用户必须重新登录
   useEffect(() => {
     let isMounted = true;
 
-    const storedToken = localStorage.getItem('token');
-    const storedUser = localStorage.getItem('user');
-
-    if (storedToken && storedUser) {
-      try {
-        const parsedUser = JSON.parse(storedUser) as User;
-        setToken(storedToken);
-        setUser(parsedUser);
-        // 验证 token 是否仍有效
-        client.get('/auth/me')
-          .then((res) => {
-            if (!isMounted) return;
-            if (res.data) {
-              setUser(res.data);
-              localStorage.setItem('user', JSON.stringify(res.data));
-            }
-          })
-          .catch((err) => {
-            if (!isMounted) return;
-            const axiosErr = err as AxiosError;
-            // 仅在确认 401（token 失效）时清除，网络错误等其他情况保留缓存用户
-            if (axiosErr.response?.status === 401) {
-              localStorage.removeItem('token');
-              localStorage.removeItem('user');
-              setToken(null);
-              setUser(null);
-            }
-            // 其他错误（网络问题等）保留现有登录态，不踢出用户
-          })
-          .finally(() => {
-            if (isMounted) setLoading(false);
-          });
-      } catch {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        if (isMounted) setLoading(false);
-      }
-    } else {
-      setLoading(false);
-    }
+    // 清除旧登录态，确保每次打开页面都需手动登录
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setToken(null);
+    setUser(null);
+    setLoading(false);
 
     return () => {
       isMounted = false;
