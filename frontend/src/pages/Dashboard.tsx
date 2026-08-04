@@ -23,20 +23,20 @@ const mockRecentEvents: Event[] = [
   { id: 1, title: '周末香山徒步登山活动', description: '', organizer_id: 1, type: 'offline', category: '户外', start_time: '2026-08-10T08:00:00', end_time: '2026-08-10T16:00:00', location_name: '北京', latitude: 39.9, longitude: 116.4, max_participants: 50, current_participants: 32, price: 50, status: 'published', tags: [] },
   { id: 2, title: '城市民谣音乐之夜', description: '', organizer_id: 1, type: 'offline', category: '音乐', start_time: '2026-08-15T19:30:00', end_time: '2026-08-15T22:00:00', location_name: '上海', latitude: 31.2, longitude: 121.5, max_participants: 100, current_participants: 67, price: 88, status: 'published', tags: [] },
   { id: 3, title: '《人类简史》读书分享会', description: '', organizer_id: 1, type: 'hybrid', category: '读书', start_time: '2026-08-12T14:00:00', end_time: '2026-08-12T17:00:00', location_name: '杭州', latitude: 30.3, longitude: 120.2, max_participants: 30, current_participants: 30, price: 0, status: 'published', tags: [] },
-  { id: 4, title: 'AI技术讲座（已结束）', description: '', organizer_id: 1, type: 'online', category: '讲座', start_time: '2026-07-28T19:00:00', end_time: '2026-07-28T21:00:00', location_name: '线上', latitude: 0, longitude: 0, max_participants: 200, current_participants: 156, price: 0, status: 'ended', tags: [] },
+  { id: 4, title: 'AI技术讲座（已结束）', description: '', organizer_id: 1, type: 'online', category: '讲座', start_time: '2026-07-28T19:00:00', end_time: '2026-07-28T21:00:00', location_name: '线上', latitude: 0, longitude: 0, max_participants: 200, current_participants: 156, price: 0, status: 'finished', tags: [] },
   { id: 5, title: '夏日烧烤派对（草稿）', description: '', organizer_id: 1, type: 'offline', category: '美食', start_time: '2026-08-25T11:00:00', end_time: '2026-08-25T20:00:00', location_name: '北京', latitude: 40.3, longitude: 116.6, max_participants: 40, current_participants: 0, price: 158, status: 'draft', tags: [] },
 ];
 
 const statusColors: Record<string, string> = {
   published: 'bg-green-400',
   draft: 'bg-gray-400',
-  ended: 'bg-red-400',
+  finished: 'bg-red-400',
 };
 
 const statusLabels: Record<string, string> = {
   published: '已发布',
   draft: '草稿',
-  ended: '已结束',
+  finished: '已结束',
 };
 
 export default function Dashboard() {
@@ -199,7 +199,7 @@ export default function Dashboard() {
                         const colors: Record<string, string> = {
                           published: '#22c55e',
                           draft: '#9ca3af',
-                          ended: '#ef4444',
+                          finished: '#ef4444',
                         };
                         return (
                           <circle

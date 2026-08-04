@@ -111,16 +111,21 @@ export default function EventManage() {
     fetchData();
   }, [fetchData]);
 
-  const handleRegStatus = async (regId: number, status: Registration['status']) => {
-    const actionKey = `reg-${regId}-${status}`;
+  const handleRegStatus = async (regId: number, action: 'approve' | 'reject' | 'checkin') => {
+    const actionKey = `reg-${regId}-${action}`;
     setActionLoading((prev) => ({ ...prev, [actionKey]: true }));
     try {
-      await client.patch(`/registrations/${regId}`, { status });
+      await client.put(`/registrations/${regId}/${action}`);
     } catch {
       // 模拟更新
     }
+    const statusMap: Record<string, Registration['status']> = {
+      approve: 'approved',
+      reject: 'rejected',
+      checkin: 'checked_in',
+    };
     setRegistrations((prev) =>
-      prev.map((r) => (r.id === regId ? { ...r, status } : r)),
+      prev.map((r) => (r.id === regId ? { ...r, status: statusMap[action] } : r)),
     );
     setActionLoading((prev) => {
       const next = { ...prev };
@@ -160,7 +165,20 @@ export default function EventManage() {
     const actionKey = `status-${status}`;
     setActionLoading((prev) => ({ ...prev, [actionKey]: true }));
     try {
-      await client.patch(`/events/${id}`, { status });
+      // 后端使用专用状态变更接口
+      const endpointMap: Record<string, string> = {
+        published: `/events/${id}/publish`,
+        ongoing: `/events/${id}/start`,
+        finished: `/events/${id}/finish`,
+        archived: `/events/${id}/archive`,
+      };
+      const endpoint = endpointMap[status];
+      if (endpoint) {
+        await client.put(endpoint);
+      } else {
+        // 兜底：直接用 PUT 更新
+        await client.put(`/events/${id}`, { status });
+      }
     } catch {
       // 模拟更新
     }
@@ -341,15 +359,15 @@ export default function EventManage() {
                         {reg.status === 'pending' && (
                           <>
                             <button
-                              onClick={() => handleRegStatus(reg.id, 'approved')}
-                              disabled={actionLoading[`reg-${reg.id}-approved`]}
+                              onClick={() => handleRegStatus(reg.id, 'approve')}
+                              disabled={actionLoading[`reg-${reg.id}-approve`]}
                               className="text-xs text-green-600 hover:bg-green-50 px-2 py-1 rounded disabled:opacity-50"
                             >
                               通过
                             </button>
                             <button
-                              onClick={() => handleRegStatus(reg.id, 'rejected')}
-                              disabled={actionLoading[`reg-${reg.id}-rejected`]}
+                              onClick={() => handleRegStatus(reg.id, 'reject')}
+                              disabled={actionLoading[`reg-${reg.id}-reject`]}
                               className="text-xs text-red-600 hover:bg-red-50 px-2 py-1 rounded disabled:opacity-50"
                             >
                               拒绝
@@ -358,8 +376,8 @@ export default function EventManage() {
                         )}
                         {reg.status === 'approved' && (
                           <button
-                            onClick={() => handleRegStatus(reg.id, 'checked_in')}
-                            disabled={actionLoading[`reg-${reg.id}-checked_in`]}
+                            onClick={() => handleRegStatus(reg.id, 'checkin')}
+                            disabled={actionLoading[`reg-${reg.id}-checkin`]}
                             className="text-xs text-blue-600 hover:bg-blue-50 px-2 py-1 rounded disabled:opacity-50"
                           >
                             签到
@@ -730,8 +748,8 @@ export default function EventManage() {
               )}
               {event.status === 'published' && (
                 <button
-                  onClick={() => handleUpdateEventStatus('ended')}
-                  disabled={actionLoading['status-ended']}
+                  onClick={() => handleUpdateEventStatus('finished')}
+                  disabled={actionLoading['status-finished']}
                   className="btn-danger disabled:opacity-50"
                 >
                   🔚 结束活动

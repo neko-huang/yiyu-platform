@@ -12,7 +12,9 @@ export const statusLabels: Record<string, { text: string; color: string }> = {
 export const eventStatusLabels: Record<string, { text: string; color: string }> = {
   published: { text: '已发布', color: 'bg-green-100 text-green-700' },
   draft: { text: '草稿', color: 'bg-gray-100 text-gray-700' },
-  ended: { text: '已结束', color: 'bg-red-100 text-red-700' },
+  finished: { text: '已结束', color: 'bg-red-100 text-red-700' },
+  ongoing: { text: '进行中', color: 'bg-blue-100 text-blue-700' },
+  archived: { text: '已归档', color: 'bg-gray-100 text-gray-500' },
 };
 
 /** 分类颜色映射 */

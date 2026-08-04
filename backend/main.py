@@ -24,6 +24,7 @@ from routers.copywriting import router as copywriting_router
 from routers.albums import router as albums_router
 from routers.discussions import router as discussions_router
 from routers.achievements import router as achievements_router
+from routers.dashboard import router as dashboard_router
 
 
 @asynccontextmanager
@@ -96,6 +97,7 @@ app.include_router(copywriting_router, prefix=API_PREFIX)
 app.include_router(albums_router, prefix=API_PREFIX)
 app.include_router(discussions_router, prefix=API_PREFIX)
 app.include_router(achievements_router, prefix=API_PREFIX)
+app.include_router(dashboard_router, prefix=API_PREFIX)
 
 
 @app.get("/")
