@@ -176,7 +176,7 @@ npm install
 ```bash
 cd backend
 # 确保虚拟环境已激活
-python seed.py
+python seed.py  # 创建管理员账号 admin/admin123
 ```
 
 这会创建测试账号和示例活动数据。
@@ -256,8 +256,7 @@ docker compose up -d
 | 角色 | 用户名 | 密码 |
 |------|--------|------|
 | 管理员 | admin | admin123 |
-| 管理员 | yiyu | yiyu123 |
-| 普通用户 | lina / wangfang / zhangwei 等 | user123 |
+| 管理员 | admin | admin123 |
 
 ### 快速验证清单
 

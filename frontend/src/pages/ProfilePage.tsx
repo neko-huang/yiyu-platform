@@ -291,7 +291,7 @@ export default function ProfilePage() {
               ) : (
                 <div className="w-full h-full bg-gradient-to-br from-primary-400 to-primary-700 flex items-center justify-center">
                   <span className="text-white text-3xl font-bold">
-                    {profile.display_name.charAt(0).toUpperCase()}
+                    {(profile.display_name || '?').charAt(0).toUpperCase()}
                   </span>
                 </div>
               )}

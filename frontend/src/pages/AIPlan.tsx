@@ -9,6 +9,10 @@ interface ChatMessage {
   content: string;
 }
 
+const STORAGE_KEY = 'aiPlanMessages';
+const API_KEY_STORAGE_KEY = 'deepseekApiKey';
+const BASE_URL_STORAGE_KEY = 'deepseekBaseUrl';
+
 const examplePrompts = [
   '帮我策划一个周末户外徒步活动，适合20-30人参加',
   '我想要组织一场公司团建，100人左右，预算每人200元',
@@ -16,18 +20,37 @@ const examplePrompts = [
   '帮我设计一个夏日音乐节活动方案',
 ];
 
+function loadMessages(): ChatMessage[] {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) return JSON.parse(saved);
+  } catch {}
+  return [];
+}
+
+function saveMessages(messages: ChatMessage[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+  } catch {}
+}
+
 export default function AIPlan() {
   const navigate = useNavigate();
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    const saved = loadMessages();
+    if (saved.length > 0) return saved;
+    return [{
       role: 'assistant',
       content: '你好！我是益屿AI活动策划助手 ✨\n\n告诉我你想举办什么样的活动，我将为你生成完整的活动方案。你可以描述：\n- 活动类型（户外、音乐、读书、运动等）\n- 预期人数\n- 预算范围\n- 特殊需求\n\n例如：「帮我策划一个周末户外徒步活动，适合20-30人参加」',
-    },
-  ]);
+    }];
+  });
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [currentPlan, setCurrentPlan] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [showSettings, setShowSettings] = useState(false);
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem(API_KEY_STORAGE_KEY) || '');
+  const [baseUrl, setBaseUrl] = useState(() => localStorage.getItem(BASE_URL_STORAGE_KEY) || 'https://api.deepseek.com');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -36,42 +59,73 @@ export default function AIPlan() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // 组件卸载时清理定时器，防止内存泄漏
+  // 消息变化时持久化
+  useEffect(() => {
+    saveMessages(messages);
+  }, [messages]);
+
+  // 组件卸载时清理定时器
   useEffect(() => {
     return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, []);
+
+  const saveApiSettings = () => {
+    localStorage.setItem(API_KEY_STORAGE_KEY, apiKey);
+    localStorage.setItem(BASE_URL_STORAGE_KEY, baseUrl);
+    setShowSettings(false);
+    setErrorMsg('API 设置已保存');
+    setTimeout(() => setErrorMsg(''), 3000);
+  };
+
+  const clearChat = () => {
+    localStorage.removeItem(STORAGE_KEY);
+    setMessages([{
+      role: 'assistant',
+      content: '你好！我是益屿AI活动策划助手 ✨\n\n告诉我你想举办什么样的活动，我将为你生成完整的活动方案。',
+    }]);
+    setCurrentPlan('');
+  };
 
   const handleSend = async (e?: FormEvent) => {
     e?.preventDefault();
     if (!input.trim() || loading) return;
 
     const userMessage = input.trim();
-    setMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
+    const updatedMessages = [...messages, { role: 'user' as const, content: userMessage }];
+    setMessages(updatedMessages);
     setInput('');
     setLoading(true);
     setErrorMsg('');
 
     try {
-      const res = await client.post('/ai/plan', { prompt: userMessage });
-      const planContent = res.data.plan || res.data.content || '抱歉，我暂时无法生成方案，请稍后重试。';
-      setMessages((prev) => [...prev, { role: 'assistant', content: planContent }]);
+      // 传递 API Key 和 Base URL 给后端
+      const payload: Record<string, string> = { prompt: userMessage };
+      if (apiKey) payload.api_key = apiKey;
+      if (baseUrl) payload.base_url = baseUrl;
+
+      const res = await client.post('/ai/plan/generate', payload);
+      const planContent = res.data.content || '抱歉，我暂时无法生成方案，请稍后重试。';
+      const newMessages = [...updatedMessages, { role: 'assistant' as const, content: planContent }];
+      setMessages(newMessages);
       setCurrentPlan(planContent);
     } catch (err) {
-      // 后端未启动 - 模拟 AI 响应
       const isNetworkErr = err instanceof Error && !('response' in err && (err as { response?: unknown }).response);
-      if (isNetworkErr) {
+      const is404 = (err as { response?: { status: number } })?.response?.status === 404;
+      
+      if (isNetworkErr || is404) {
+        // 后端不可达或端点不存在 → 模拟
         const mockPlan = generateMockPlan(userMessage);
         timeoutRef.current = setTimeout(() => {
-          setMessages((prev) => [...prev, { role: 'assistant', content: mockPlan }]);
+          const newMessages = [...updatedMessages, { role: 'assistant' as const, content: mockPlan }];
+          setMessages(newMessages);
           setCurrentPlan(mockPlan);
           timeoutRef.current = null;
         }, 1500);
       } else {
-        setErrorMsg(getErrorMessage(err, 'AI 服务暂时不可用，请稍后重试'));
+        const errMsg = getErrorMessage(err, 'AI 服务暂时不可用');
+        setErrorMsg(errMsg);
       }
     } finally {
       setLoading(false);
@@ -80,18 +134,15 @@ export default function AIPlan() {
 
   const handleSavePlan = () => {
     if (!currentPlan) return;
-    // 保存到 localStorage
     const savedPlans = JSON.parse(localStorage.getItem('savedPlans') || '[]');
     savedPlans.push({ content: currentPlan, saved_at: new Date().toISOString() });
     localStorage.setItem('savedPlans', JSON.stringify(savedPlans));
     setErrorMsg('方案已保存！');
-    // 3 秒后清除提示
     setTimeout(() => setErrorMsg(''), 3000);
   };
 
   const handleConvertToEvent = () => {
     if (!currentPlan) return;
-    // 将方案存入 sessionStorage，CreateEvent 页面可读取
     sessionStorage.setItem('aiPlanContent', currentPlan);
     navigate('/events/create');
   };
@@ -110,46 +161,77 @@ export default function AIPlan() {
           </div>
           <div className="flex gap-2 items-center">
             {errorMsg && (
-              <span className={`text-sm ${errorMsg.includes('已保存') ? 'text-green-600' : 'text-red-500'}`}>
+              <span className={`text-sm ${errorMsg.includes('已保存') || errorMsg.includes('已设置') ? 'text-green-600' : 'text-red-500'}`}>
                 {errorMsg}
               </span>
             )}
-            <button
-              onClick={handleSavePlan}
-              disabled={!currentPlan}
-              className="btn-secondary text-sm"
-            >
+            <button onClick={() => setShowSettings(!showSettings)} className="btn-secondary text-sm">
+              ⚙️ 设置
+            </button>
+            <button onClick={clearChat} className="btn-secondary text-sm">
+              🗑️ 清空对话
+            </button>
+            <button onClick={handleSavePlan} disabled={!currentPlan} className="btn-secondary text-sm">
               💾 保存方案
             </button>
-            <button
-              onClick={handleConvertToEvent}
-              disabled={!currentPlan}
-              className="btn-primary text-sm"
-            >
+            <button onClick={handleConvertToEvent} disabled={!currentPlan} className="btn-primary text-sm">
               📋 转化为活动
             </button>
           </div>
         </div>
       </div>
 
+      {/* Settings panel */}
+      {showSettings && (
+        <div className="bg-amber-50 border-b border-amber-200 px-6 py-4">
+          <div className="max-w-3xl mx-auto">
+            <h3 className="text-sm font-semibold text-amber-800 mb-3">⚙️ DeepSeek API 配置</h3>
+            <p className="text-xs text-amber-600 mb-3">
+              配置你自己的 DeepSeek API Key，AI 策划将使用你的额度生成真实方案。留空则使用模拟数据。
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex-1">
+                <label className="block text-xs font-medium text-amber-700 mb-1">API Key</label>
+                <input
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  className="input-field text-sm"
+                  placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="block text-xs font-medium text-amber-700 mb-1">Base URL</label>
+                <input
+                  type="text"
+                  value={baseUrl}
+                  onChange={(e) => setBaseUrl(e.target.value)}
+                  className="input-field text-sm"
+                  placeholder="https://api.deepseek.com"
+                />
+              </div>
+              <div className="flex items-end">
+                <button onClick={saveApiSettings} className="btn-primary text-sm px-4">
+                  保存
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex-1 flex overflow-hidden">
         {/* Chat area */}
         <div className="flex-1 flex flex-col">
-          {/* Messages */}
           <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4" aria-live="polite">
             <div className="max-w-3xl mx-auto">
               {messages.map((msg, idx) => (
-                <div
-                  key={idx}
-                  className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}
-                >
-                  <div
-                    className={`max-w-[80%] rounded-2xl px-4 py-3 ${
-                      msg.role === 'user'
-                        ? 'bg-primary-500 text-white'
-                        : 'bg-white border border-gray-200 text-gray-700'
-                    }`}
-                  >
+                <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}>
+                  <div className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                    msg.role === 'user'
+                      ? 'bg-primary-500 text-white'
+                      : 'bg-white border border-gray-200 text-gray-700'
+                  }`}>
                     {msg.role === 'assistant' ? (
                       <div className="prose prose-sm max-w-none">
                         <ReactMarkdown>{msg.content}</ReactMarkdown>
@@ -180,8 +262,8 @@ export default function AIPlan() {
             </div>
           </div>
 
-          {/* Example prompts */}
-          {messages.length <= 1 && (
+          {/* Example prompts (only show when no user messages) */}
+          {messages.filter(m => m.role === 'user').length === 0 && (
             <div className="px-4 pb-2">
               <div className="max-w-3xl mx-auto">
                 <p className="text-xs text-gray-400 mb-2">💡 试试这些示例：</p>
@@ -212,11 +294,7 @@ export default function AIPlan() {
                 disabled={loading}
                 aria-label="输入活动描述"
               />
-              <button
-                type="submit"
-                disabled={loading || !input.trim()}
-                className="btn-primary px-6"
-              >
+              <button type="submit" disabled={loading || !input.trim()} className="btn-primary px-6">
                 发送
               </button>
             </form>
@@ -246,7 +324,7 @@ export default function AIPlan() {
   );
 }
 
-// 模拟 AI 生成的方案
+// 模拟 AI 生成的方案（后端不可用时兜底）
 function generateMockPlan(prompt: string): string {
   const hasOutdoor = /户外|徒步|登山|露营/.test(prompt);
   const hasMusic = /音乐|演出|演唱会/.test(prompt);

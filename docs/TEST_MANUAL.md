@@ -27,7 +27,7 @@ pip install -r requirements.txt
 # 创建 .env 文件（参考 .env.example）
 cp ../.env.example .env
 # 编辑 .env 填入 DeepSeek API Key
-python seed.py          # 初始化种子数据
+python seed.py          # 创建管理员账号 admin/admin123
 python main.py          # 启动后端 (http://localhost:8000)
 
 # 3. 启动前端（另开一个终端）
@@ -46,15 +46,7 @@ run.bat all
 | 角色 | 用户名 | 密码 | 说明 |
 |---|---|---|---|
 | 管理员 | admin | admin123 | 系统管理员 |
-| 管理员 | yiyu | yiyu123 | 益屿官方账号 |
-| 普通用户 | lina | user123 | 兴趣：音乐、摄影 |
-| 普通用户 | wangfang | user123 | 兴趣：读书、写作 |
-| 普通用户 | zhangwei | user123 | 兴趣：运动、健身、户外 |
-| 普通用户 | chenyu | user123 | 兴趣：科技、讲座 |
-| 普通用户 | liuyang | user123 | 兴趣：音乐、户外 |
-| 普通用户 | zhaojing | user123 | 兴趣：读书、美食 |
-| 普通用户 | sunhao | user123 | 兴趣：运动、摄影 |
-| 普通用户 | zhoumin | user123 | 兴趣：艺术、讲座、音乐 |
+| 管理员 | admin | admin123 | 平台管理员 |
 
 ---
 
@@ -79,7 +71,7 @@ run.bat all
 |---|---|---|---|---|
 | L1 | 访问 http://localhost:5173/login | 显示登录表单 | | |
 | L2 | 输入 admin / admin123，点击"登录" | 登录成功，跳转到首页，导航栏显示用户名 | | |
-| L3 | 输入 user1 / user123（错误用户名） | 提示"用户名或密码错误" | | |
+| L3 | 输入 admin / admin123（错误用户名） | 提示"用户名或密码错误" | | |
 | L4 | 输入 admin / wrongpwd（错误密码） | 提示"用户名或密码错误" | | |
 | L5 | 不填任何字段直接提交 | 前端提示"请输入用户名和密码" | | |
 | L6 | 登录成功后刷新页面 | 保持登录状态（token 在 localStorage） | | |

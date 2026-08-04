@@ -26,10 +26,22 @@ SYSTEM_PROMPT = """你是一位资深的社区活动策划专家。请根据用�
 请确保内容具体、可执行，金额单位为人民币元。"""
 
 
-async def _call_deepseek(system_prompt: str, user_content: str, max_tokens: int = 4096) -> str:
-    """DeepSeek API 通用调用封装"""
+async def _call_deepseek(
+    system_prompt: str,
+    user_content: str,
+    max_tokens: int = 4096,
+    api_key: str | None = None,
+    base_url: str | None = None,
+) -> str:
+    """DeepSeek API 通用调用封装
+
+    支持前端传入自定义 api_key 和 base_url（优先级高于环境变量）
+    """
+    effective_key = api_key or DEEPSEEK_API_KEY
+    effective_base_url = (base_url or DEEPSEEK_BASE_URL).rstrip("/")
+
     headers = {
-        "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+        "Authorization": f"Bearer {effective_key}",
         "Content-Type": "application/json",
     }
     payload = {
@@ -44,7 +56,7 @@ async def _call_deepseek(system_prompt: str, user_content: str, max_tokens: int 
     }
     async with httpx.AsyncClient(timeout=120) as client:
         resp = await client.post(
-            f"{DEEPSEEK_BASE_URL}/v1/chat/completions",
+            f"{effective_base_url}/v1/chat/completions",
             json=payload,
             headers=headers,
         )
@@ -53,7 +65,12 @@ async def _call_deepseek(system_prompt: str, user_content: str, max_tokens: int 
     return data["choices"][0]["message"]["content"]
 
 
-async def generate_event_plan(idea: str, mode: str = "direct") -> str:
+async def generate_event_plan(
+    idea: str,
+    mode: str = "direct",
+    api_key: str | None = None,
+    base_url: str | None = None,
+) -> str:
     """
     调用 DeepSeek API 生成活动方案。
 
@@ -65,7 +82,7 @@ async def generate_event_plan(idea: str, mode: str = "direct") -> str:
         生成的 Markdown 方案文本
     """
     user_content = f"请为以下活动想法生成一份详细的活动方案：\n\n{idea}"
-    return await _call_deepseek(SYSTEM_PROMPT, user_content)
+    return await _call_deepseek(SYSTEM_PROMPT, user_content, api_key=api_key, base_url=base_url)
 
 
 REVIEW_SYSTEM_PROMPT = """你是一位经验丰富的活动运营专家。请根据提供的活动信息和复盘要点，生成一份结构化的复盘摘要。

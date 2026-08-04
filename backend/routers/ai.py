@@ -27,7 +27,11 @@ async def generate_plan(
 ):
     """调用 DeepSeek 生成活动方案"""
     try:
-        content = await generate_event_plan(payload.idea, payload.mode)
+        # 兼容前端 prompt 字段，也支持 idea 字段
+        user_input = payload.prompt or payload.idea
+        api_key = payload.api_key or None
+        base_url = payload.base_url or None
+        content = await generate_event_plan(user_input, payload.mode, api_key=api_key, base_url=base_url)
     except httpx.HTTPStatusError as e:
         logger.warning("AI 服务返回错误: %s", e.response.status_code)
         raise HTTPException(

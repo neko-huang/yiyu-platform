@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import AMapLoader from '@amap/amap-jsapi-loader';
 import type { Event } from '../types';
 
@@ -24,14 +24,21 @@ export default function MapView({
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
+  const [mapError, setMapError] = useState('');
 
   useEffect(() => {
     if (!mapRef.current) return;
 
     let disposed = false;
+    const amapKey = import.meta.env.VITE_AMAP_KEY || '';
+
+    if (!amapKey) {
+      setMapError('未配置高德地图 API Key，请在 frontend/.env 中设置 VITE_AMAP_KEY');
+      return;
+    }
 
     AMapLoader.load({
-      key: import.meta.env.VITE_AMAP_KEY || '',
+      key: amapKey,
       version: '2.0',
       plugins: ['AMap.Marker', 'AMap.InfoWindow'],
     }).then((AMap) => {
@@ -111,6 +118,7 @@ export default function MapView({
       }
     }).catch((err: Error) => {
       console.error('Failed to load AMap:', err);
+      setMapError(`高德地图加载失败：${err.message || '请检查 API Key 是否正确，或该 Key 是否已添加当前域名到白名单'}`);
     });
 
     return () => {
@@ -124,10 +132,21 @@ export default function MapView({
   }, [events, singleMarker, center, zoom, onMapClick, interactive]);
 
   return (
-    <div
-      ref={mapRef}
-      className="rounded-xl overflow-hidden border border-gray-200"
-      style={{ width: '100%', height }}
-    />
+    <>
+      {mapError && (
+        <div className="flex items-center justify-center bg-red-50 border border-red-200 rounded-xl p-6 text-center" style={{ height }}>
+          <div>
+            <div className="text-4xl mb-3">🗺️</div>
+            <p className="text-red-600 text-sm font-medium mb-1">地图加载失败</p>
+            <p className="text-red-500 text-xs">{mapError}</p>
+          </div>
+        </div>
+      )}
+      <div
+        ref={mapRef}
+        className={`rounded-xl overflow-hidden border border-gray-200 ${mapError ? 'hidden' : ''}`}
+        style={{ width: '100%', height }}
+      />
+    </>
   );
 }

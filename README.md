@@ -80,7 +80,7 @@ echo "DEEPSEEK_API_KEY=your-api-key-here" > .env
 export DEEPSEEK_API_KEY=your-api-key-here  # macOS/Linux
 set DEEPSEEK_API_KEY=your-api-key-here     # Windows CMD
 
-# 初始化模拟数据（可选，生成测试账号和活动）
+# 初始化数据库（创建管理员账号）
 python seed.py
 
 # 启动后端服务
@@ -92,12 +92,12 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 - API 文档: http://localhost:8000/docs
 - 健康检查: http://localhost:8000/health
 
-**模拟数据账号：**
+**默认管理员账号：**
 | 角色 | 用户名 | 密码 |
 |------|--------|------|
 | 管理员 | admin | admin123 |
-| 管理员 | yiyu | yiyu123 |
-| 普通用户 | user1 ~ user8 | user123 |
+
+**需要测试数据？** 使用 [yiyu-mock-data](https://github.com/neko-huang/yiyu-mock-data) 仓库，克隆后运行 `python seed.py` 即可导入 25 个用户、55+ 活动。
 
 ### 第三步：前端部署
 

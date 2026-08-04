@@ -9,6 +9,9 @@ from pydantic import BaseModel, Field
 class AIPlanGenerateRequest(BaseModel):
     idea: str = Field(..., min_length=1, description="用户想法描述")
     mode: Literal["direct", "guided"] = "direct"
+    prompt: str | None = None
+    api_key: str | None = None
+    base_url: str | None = None
 
 
 class AIPlanGenerateResponse(BaseModel):
