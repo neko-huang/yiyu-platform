@@ -150,30 +150,50 @@ goto :menu
 :do_stop_all
 echo  Stopping all services...
 
-:: 1. Kill by window title (try exact + wildcard)
-echo   - Closing YiYu-Backend window...
-taskkill /FI "WINDOWTITLE eq YiYu-Backend" /T /F >nul 2>&1
-taskkill /FI "WINDOWTITLE eq YiYu-Backend*" /T /F >nul 2>&1
-
-echo   - Closing YiYu-Frontend window...
-taskkill /FI "WINDOWTITLE eq YiYu-Frontend" /T /F >nul 2>&1
-taskkill /FI "WINDOWTITLE eq YiYu-Frontend*" /T /F >nul 2>&1
-
-:: 2. Kill by port (more robust /C: search)
-echo   - Killing processes on port 8000...
-for /f "tokens=5" %%p in ('netstat -aon ^| findstr /C:":8000 " ^| findstr /C:"LISTENING" 2^>nul') do (
-    taskkill /PID %%p /F >nul 2>&1
+:: ===== Method 1: Find PIDs by window title, then kill by PID =====
+echo   - Finding YiYu-Backend PIDs...
+setlocal enabledelayedexpansion
+for /f "tokens=2" %%p in ('tasklist /V /FI "WINDOWTITLE eq YiYu-Backend*" /NH 2^>nul ^| findstr /R "^cmd\.exe"') do (
+    echo   [KILL] PID: %%p (YiYu-Backend)
+    taskkill /PID %%p /T /F >nul 2>&1
 )
+
+echo   - Finding YiYu-Frontend PIDs...
+for /f "tokens=2" %%p in ('tasklist /V /FI "WINDOWTITLE eq YiYu-Frontend*" /NH 2^>nul ^| findstr /R "^cmd\.exe"') do (
+    echo   [KILL] PID: %%p (YiYu-Frontend)
+    taskkill /PID %%p /T /F >nul 2>&1
+)
+endlocal
+
+:: ===== Method 2: Kill by port (get last token = PID) =====
+echo   - Killing processes on port 8000...
+setlocal enabledelayedexpansion
+for /f "tokens=*" %%a in ('netstat -aon ^| findstr /C:":8000 " ^| findstr /C:"LISTENING" 2^>nul') do (
+    set "PORT_PID="
+    for %%b in (%%a) do set "PORT_PID=%%b"
+    if defined PORT_PID (
+        echo   [KILL] PID: !PORT_PID! (port 8000)
+        taskkill /PID !PORT_PID! /F >nul 2>&1
+    )
+)
+endlocal
 
 echo   - Killing processes on port 5173...
-for /f "tokens=5" %%p in ('netstat -aon ^| findstr /C:":5173 " ^| findstr /C:"LISTENING" 2^>nul') do (
-    taskkill /PID %%p /F >nul 2>&1
+setlocal enabledelayedexpansion
+for /f "tokens=*" %%a in ('netstat -aon ^| findstr /C:":5173 " ^| findstr /C:"LISTENING" 2^>nul') do (
+    set "PORT_PID="
+    for %%b in (%%a) do set "PORT_PID=%%b"
+    if defined PORT_PID (
+        echo   [KILL] PID: !PORT_PID! (port 5173)
+        taskkill /PID !PORT_PID! /F >nul 2>&1
+    )
 )
+endlocal
 
-:: 3. Last resort: kill by image name + window title filter
-echo   - Trying to kill python/node processes...
-taskkill /IM python.exe /FI "WINDOWTITLE eq YiYu-Backend*" /F >nul 2>&1
-taskkill /IM node.exe /FI "WINDOWTITLE eq YiYu-Frontend*" /F >nul 2>&1
+:: ===== Method 3: Force kill all python and node processes =====
+echo   - Force killing python/node processes...
+taskkill /IM python.exe /F >nul 2>&1
+taskkill /IM node.exe /F >nul 2>&1
 
 echo  [OK] All services stopped.
 exit /b 0
@@ -203,7 +223,7 @@ call venv\Scripts\activate.bat
 cd /d "%ROOT%"
 
 :backend_launch
-start "YiYu-Backend" /d "%BACKEND_DIR%" cmd /k "call venv\Scripts\activate.bat && python main.py"
+start "YiYu-Backend" /d "%BACKEND_DIR%" cmd /k "title YiYu-Backend && call venv\Scripts\activate.bat && python main.py"
 timeout /t 3 /nobreak >nul
 exit /b 0
 
@@ -223,6 +243,6 @@ goto :frontend_launch
 :frontend_deps_ok
 
 :frontend_launch
-start "YiYu-Frontend" /d "%FRONTEND_DIR%" cmd /k "npm run dev"
+start "YiYu-Frontend" /d "%FRONTEND_DIR%" cmd /k "title YiYu-Frontend && npm run dev"
 timeout /t 2 /nobreak >nul
 exit /b 0
