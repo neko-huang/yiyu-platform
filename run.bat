@@ -150,23 +150,30 @@ goto :menu
 :do_stop_all
 echo  Stopping all services...
 
-:: 1. Kill by window title (close the cmd windows and their child processes)
+:: 1. Kill by window title (try exact + wildcard)
 echo   - Closing YiYu-Backend window...
+taskkill /FI "WINDOWTITLE eq YiYu-Backend" /T /F >nul 2>&1
 taskkill /FI "WINDOWTITLE eq YiYu-Backend*" /T /F >nul 2>&1
 
 echo   - Closing YiYu-Frontend window...
+taskkill /FI "WINDOWTITLE eq YiYu-Frontend" /T /F >nul 2>&1
 taskkill /FI "WINDOWTITLE eq YiYu-Frontend*" /T /F >nul 2>&1
 
-:: 2. Fallback: kill by port (in case windows were renamed)
+:: 2. Kill by port (more robust /C: search)
 echo   - Killing processes on port 8000...
-for /f "tokens=5" %%p in ('netstat -aon 2^>nul ^| findstr ":8000" ^| findstr "LISTENING" 2^>nul') do (
+for /f "tokens=5" %%p in ('netstat -aon ^| findstr /C:":8000 " ^| findstr /C:"LISTENING" 2^>nul') do (
     taskkill /PID %%p /F >nul 2>&1
 )
 
 echo   - Killing processes on port 5173...
-for /f "tokens=5" %%p in ('netstat -aon 2^>nul ^| findstr ":5173" ^| findstr "LISTENING" 2^>nul') do (
+for /f "tokens=5" %%p in ('netstat -aon ^| findstr /C:":5173 " ^| findstr /C:"LISTENING" 2^>nul') do (
     taskkill /PID %%p /F >nul 2>&1
 )
+
+:: 3. Last resort: kill by image name + window title filter
+echo   - Trying to kill python/node processes...
+taskkill /IM python.exe /FI "WINDOWTITLE eq YiYu-Backend*" /F >nul 2>&1
+taskkill /IM node.exe /FI "WINDOWTITLE eq YiYu-Frontend*" /F >nul 2>&1
 
 echo  [OK] All services stopped.
 exit /b 0
