@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import client from '../api/client';
 import { getErrorMessage } from '../utils/errors';
 import { useAuth } from '../contexts/AuthContext';
@@ -276,7 +277,7 @@ export default function AIPlan() {
                   }`}>
                     {msg.role === 'assistant' ? (
                       <div className="prose prose-sm max-w-none">
-                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
                       </div>
                     ) : (
                       <p className="whitespace-pre-wrap text-sm">{msg.content}</p>
@@ -351,7 +352,7 @@ export default function AIPlan() {
           <div className="flex-1 overflow-y-auto p-4">
             {currentPlan ? (
               <div className="prose prose-sm max-w-none">
-                <ReactMarkdown>{currentPlan}</ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{currentPlan}</ReactMarkdown>
               </div>
             ) : (
               <div className="text-center text-gray-400 mt-12">
