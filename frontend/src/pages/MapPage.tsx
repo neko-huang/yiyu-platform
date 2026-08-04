@@ -3,7 +3,7 @@ import MapView from '../components/MapView';
 import client from '../api/client';
 import type { Event } from '../types';
 
-// 模拟数据 - 覆盖多个城市的活动
+// 模拟数据 - 覆盖多个城市的活动（含经纬度）
 const mockEvents: Event[] = [
   { id: 1, title: '周末香山徒步登山活动', description: '香山红叶徒步', organizer_id: 1, type: 'offline', category: '户外', start_time: '2026-08-10T08:00:00', end_time: '2026-08-10T16:00:00', location_name: '北京香山公园', latitude: 39.9929, longitude: 116.1883, max_participants: 50, current_participants: 32, price: 50, status: 'published', tags: ['徒步'] },
   { id: 2, title: '城市民谣音乐之夜', description: '民谣现场演出', organizer_id: 2, type: 'offline', category: '音乐', start_time: '2026-08-15T19:30:00', end_time: '2026-08-15T22:00:00', location_name: '上海·思南公馆', latitude: 31.2226, longitude: 121.4737, max_participants: 100, current_participants: 67, price: 88, status: 'published', tags: ['民谣'] },
@@ -25,8 +25,16 @@ export default function MapPage() {
   const fetchEvents = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await client.get('/events', { params: { status: 'published' } });
-      setEvents(res.data.items || []);
+      // 先用 /events/map 获取有经纬度的活动
+      const mapRes = await client.get('/events/map');
+      const mapItems = Array.isArray(mapRes.data) ? mapRes.data : [];
+      // 再用 /events?status=published 获取完整活动信息（含价格/人数等）
+      const fullRes = await client.get('/events', { params: { status: 'published' } });
+      const fullItems: Event[] = fullRes.data.items || [];
+      // 合并：只保留有经纬度的活动，用 map 信息补充完整数据
+      const mapIds = new Set(mapItems.map((m: { id: number }) => m.id));
+      const merged = fullItems.filter((e) => mapIds.has(e.id));
+      setEvents(merged.length > 0 ? merged : mapItems);
     } catch {
       // 后端未启动，使用模拟数据
       setEvents(mockEvents);

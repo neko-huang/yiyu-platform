@@ -1,4 +1,4 @@
-import { useState, FormEvent, useEffect, useCallback } from 'react';
+import { useState, FormEvent, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import MapView from '../components/MapView';
 import client from '../api/client';
@@ -23,25 +23,35 @@ interface FormData {
 export default function CreateEvent() {
   const navigate = useNavigate();
 
+  // 读取存储的 AI 方案数据（sessionStorage 优先，localStorage 兜底）
+  const readAIPlanData = () => {
+    let data = sessionStorage.getItem('aiPlanData');
+    if (!data) data = localStorage.getItem('aiPlanData');
+    if (data) {
+      try {
+        const parsed = JSON.parse(data);
+        sessionStorage.removeItem('aiPlanData');
+        localStorage.removeItem('aiPlanData');
+        return parsed;
+      } catch { /* ignore */ }
+    }
+    return null;
+  };
+
   const [formData, setFormData] = useState<FormData>(() => {
-    // 从 sessionStorage 读取 AI 策划结构化数据（优先于旧版纯文本）
     let aiTitle = '';
     let aiDescription = '';
     let aiTags = '';
     let aiCategory = '';
     let aiMaxParticipants = 50;
 
-    const aiPlanData = sessionStorage.getItem('aiPlanData');
-    if (aiPlanData) {
-      try {
-        const parsed = JSON.parse(aiPlanData);
-        aiTitle = parsed.title || '';
-        aiDescription = parsed.description || '';
-        aiTags = parsed.tags || '';
-        aiCategory = parsed.category || '';
-        aiMaxParticipants = parsed.max_participants || 50;
-        sessionStorage.removeItem('aiPlanData');
-      } catch { /* ignore */ }
+    const aiData = readAIPlanData();
+    if (aiData) {
+      aiTitle = aiData.title || '';
+      aiDescription = aiData.description || '';
+      aiTags = aiData.tags || '';
+      aiCategory = aiData.category || '';
+      aiMaxParticipants = aiData.max_participants || 50;
     }
 
     // 旧版：从 sessionStorage 读取 AI 策划纯文本内容（降级）
@@ -92,6 +102,24 @@ export default function CreateEvent() {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [showAIModal, closeModal]);
+
+  // 兜底：如果 useState 初始值未能读取（组件复用），用 useEffect 再检查一次
+  const dataLoadedRef = useRef(false);
+  useEffect(() => {
+    if (dataLoadedRef.current) return;
+    dataLoadedRef.current = true;
+    const aiData = readAIPlanData();
+    if (aiData) {
+      setFormData((prev) => ({
+        ...prev,
+        title: aiData.title || prev.title,
+        description: aiData.description || prev.description,
+        tags: aiData.tags || prev.tags,
+        category: aiData.category || prev.category,
+        max_participants: aiData.max_participants || prev.max_participants,
+      }));
+    }
+  }, []);
 
   const handleChange = (field: keyof FormData, value: string | number) => {
     setFormData((prev) => ({ ...prev, [field]: value }));

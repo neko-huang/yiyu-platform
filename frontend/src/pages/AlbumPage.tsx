@@ -38,7 +38,11 @@ export default function AlbumPage() {
   const [loading, setLoading] = useState(true);
   const [selectedPhoto, setSelectedPhoto] = useState<AlbumPhoto | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [cameraActive, setCameraActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   const eventId = Number(id);
 
@@ -57,6 +61,78 @@ export default function AlbumPage() {
   useEffect(() => {
     fetchAlbums();
   }, [fetchAlbums]);
+
+  // 清理摄像头
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    setCameraActive(false);
+  }, []);
+
+  useEffect(() => {
+    return () => stopCamera();
+  }, [stopCamera]);
+
+  // 打开摄像头拍照
+  const handleTakePhoto = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      streamRef.current = stream;
+      setCameraActive(true);
+      // 等 DOM 更新后绑定视频流
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      }, 100);
+    } catch {
+      // 摄像头不可用，回退到文件选择
+      fileInputRef.current?.click();
+    }
+  }, []);
+
+  // 捕获当前摄像头画面
+  const capturePhoto = useCallback(async () => {
+    if (!videoRef.current || !canvasRef.current) return;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0);
+    // 转为 Blob 并上传
+    canvas.toBlob(async (blob) => {
+      if (!blob) return;
+      stopCamera();
+      const file = new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' });
+      setUploading(true);
+      try {
+        const albumId = albums[0]?.id || 1;
+        const uploadRes = await uploadImage(file);
+        await addAlbumPhoto(albumId, { image_url: uploadRes.url, caption: '拍照' });
+        await fetchAlbums();
+      } catch {
+        const newPhoto: AlbumPhoto = {
+          id: Date.now(),
+          album_id: albums[0]?.id || 1,
+          user_id: 1,
+          image_url: '',
+          caption: '拍照',
+          ai_caption: null,
+          sort_order: 99,
+          created_at: new Date().toISOString(),
+        };
+        setAlbums((prev) =>
+          prev.map((a) => (a.id === (albums[0]?.id || 1) ? { ...a, photos: [...a.photos, newPhoto] } : a))
+        );
+      } finally {
+        setUploading(false);
+      }
+    }, 'image/jpeg', 0.9);
+  }, [albums, fetchAlbums, stopCamera]);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -129,22 +205,31 @@ export default function AlbumPage() {
           <p className="text-gray-500 text-sm mt-1">共 {allPhotos.length} 张照片</p>
         </div>
         <div className="flex gap-2">
-          <label className="btn-secondary cursor-pointer flex items-center gap-2">
-            <span>📷 拍照</span>
-            <input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              onChange={handleUpload}
-              disabled={uploading}
-            />
-          </label>
-          <label className="btn-primary cursor-pointer flex items-center gap-2">
-            <span>{uploading ? '上传中...' : '🖼️ 从相册选择'}</span>
-            <input
-              ref={fileInputRef}
-              type="file"
+          {cameraActive ? (
+            <div className="fixed inset-0 bg-black z-50 flex items-center justify-center">
+              <div className="relative max-w-2xl w-full mx-4">
+                <video ref={videoRef} autoPlay playsInline className="w-full rounded-xl" />
+                <canvas ref={canvasRef} className="hidden" />
+                <div className="flex justify-center gap-4 mt-4">
+                  <button onClick={capturePhoto} disabled={uploading} className="btn-primary text-lg px-8">
+                    📸 拍照
+                  </button>
+                  <button onClick={stopCamera} className="btn-secondary text-lg px-8">
+                    ✕ 取消
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              <button onClick={handleTakePhoto} disabled={uploading} className="btn-secondary cursor-pointer flex items-center gap-2">
+                <span>📷 拍照</span>
+              </button>
+              <label className="btn-primary cursor-pointer flex items-center gap-2">
+                <span>{uploading ? '上传中...' : '🖼️ 从相册选择'}</span>
+                <input
+                  ref={fileInputRef}
+                  type="file"
               accept="image/*"
               multiple
               className="hidden"
@@ -152,6 +237,8 @@ export default function AlbumPage() {
               disabled={uploading}
             />
           </label>
+            </>
+          )}
         </div>
       </div>
 

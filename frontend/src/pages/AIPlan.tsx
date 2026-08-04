@@ -197,31 +197,48 @@ export default function AIPlan() {
   };
 
   // 解析 AI 方案 markdown，提取结构化字段用于创建活动
+  // 支持多种格式：**活动名称**：XXX / - 活动名称：XXX / 活动名称：XXX
   const parseAIPlan = (markdown: string) => {
     let title = '';
     let category = '其他';
     let tags = '';
     let maxParticipants = 50;
 
-    // 从第一个 # 标题提取活动名称
-    const titleMatch = markdown.match(/^#\s+(.+)$/m);
-    if (titleMatch) title = titleMatch[1].trim();
+    // 尝试从多个来源提取标题，优先级从高到低
+    // 1. **活动名称**：XXX
+    const nameBold = markdown.match(/\*\*活动名称\*\*\s*[：:]\s*(.+?)(?:\n|$)/);
+    if (nameBold) title = nameBold[1].trim();
+    // 2. - 活动名称：XXX 或 活动名称：XXX
+    if (!title) {
+      const nameDash = markdown.match(/[-–—]\s*活动名称\s*[：:]\s*(.+?)(?:\n|$)/);
+      if (nameDash) title = nameDash[1].trim();
+    }
+    if (!title) {
+      const namePlain = markdown.match(/^活动名称\s*[：:]\s*(.+?)(?:\n|$)/m);
+      if (namePlain) title = namePlain[1].trim();
+    }
+    // 3. 第一个 # 标题
+    if (!title) {
+      const titleMatch = markdown.match(/^#\s+(.+)$/m);
+      if (titleMatch) title = titleMatch[1].trim();
+    }
+    // 4. 去掉"方案"后缀的标题
+    if (!title) {
+      const firstLine = markdown.split('\n')[0].replace(/^#\s*/, '').trim();
+      if (firstLine) title = firstLine;
+    }
 
-    // 提取 活动概述 章节
+    // 提取 活动概述 章节（支持多种格式）
     const overviewSection = markdown.match(/##\s*活动概述[\s\S]*?(?=##|$)/);
     if (overviewSection) {
       const overview = overviewSection[0];
 
-      // **活动名称** 优先覆盖标题
-      const nameMatch = overview.match(/\*\*活动名称\*\*\s*[：:]\s*(.+)/);
-      if (nameMatch) title = nameMatch[1].trim();
-
-      // 预期规模
-      const scaleMatch = overview.match(/\*\*预期规模\*\*\s*[：:]\s*(\d+)/);
+      // 从概述中提取**预期规模** 或 - 预期规模：XX人
+      const scaleMatch = overview.match(/(?:\*\*预期规模\*\*|预期规模)\s*[：:]\s*(\d+)/);
       if (scaleMatch) maxParticipants = parseInt(scaleMatch[1], 10);
 
       // 从主题提取标签
-      const themeMatch = overview.match(/\*\*主题\*\*\s*[：:]\s*(.+)/);
+      const themeMatch = overview.match(/(?:\*\*主题\*\*|主题)\s*[：:]\s*(.+?)(?:\n|$)/);
       if (themeMatch) {
         const theme = themeMatch[1].trim();
         const keywords = theme.split(/[，,、\s]+/).filter((k: string) => k.length > 1);
@@ -229,8 +246,8 @@ export default function AIPlan() {
       }
     }
 
-    // 从标题+主题推断分类
-    const combined = (title + ' ' + (markdown.match(/\*\*主题\*\*[：:]\s*(.+)/)?.[1] || '')).toLowerCase();
+    // 从标题+全文推断分类
+    const combined = title.toLowerCase();
     if (/猫|狗|宠物|动物|萌宠/.test(combined)) category = '宠物';
     else if (/户外|徒步|登山|露营|爬山/.test(combined)) category = '户外';
     else if (/音乐|演出|演唱会|乐队/.test(combined)) category = '音乐';
@@ -247,7 +264,9 @@ export default function AIPlan() {
   const handleConvertToEvent = () => {
     if (!currentPlan) return;
     const parsed = parseAIPlan(currentPlan);
+    // 同时存入 sessionStorage 和 localStorage，确保数据不丢失
     sessionStorage.setItem('aiPlanData', JSON.stringify(parsed));
+    localStorage.setItem('aiPlanData', JSON.stringify(parsed));
     navigate('/events/create');
   };
 
