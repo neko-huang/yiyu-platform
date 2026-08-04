@@ -1,10 +1,10 @@
 """DeepSeek AI 服务封装"""
 
-import re
+import logging
 
 import httpx
 
-from config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL
+from config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL, AMAP_KEY
 
 # =========================================================================
 # 益屿平台场馆信息（System Prompt 中嵌入，让 AI 推荐真实场地）
@@ -228,84 +228,104 @@ async def generate_event_plan(
 async def _search_venues(city: str) -> str:
     """搜索指定城市的活动场地和场馆信息，返回格式化文本
 
-    使用 DuckDuckGo HTML 搜索接口（POST），比 Lite 接口更稳定。
-    备选：DuckDuckGo Instant Answer API（GET）。
+    使用高德地图 POI 搜索 API（V5 版本优先，V3 作为降级）。
     """
+    logger = logging.getLogger(__name__)
+
+    if not AMAP_KEY:
+        logger.warning("AMAP_KEY 未配置，跳过场地搜索")
+        return ""
+
+    # 三段查询：咖啡馆、活动空间、文创园区/艺术区
     search_queries = [
-        f"{city} 活动场地 场馆 出租 包场",
-        f"{city} 咖啡馆 活动空间 文创园区",
-        f"{city} 宠物友好 公园 户外 活动场地",
+        {"keywords": "咖啡馆", "types": "050000"},
+        {"keywords": "活动空间 共享空间 创意园区", "types": "140000"},
+        {"keywords": "艺术区 文创园 展览空间", "types": "080000"},
     ]
 
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                       "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    }
-
     all_results = []
-    for query in search_queries:
-        try:
-            async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
-                # 方案 A：DuckDuckGo HTML 搜索（POST，更稳定）
-                resp = await client.post(
-                    "https://html.duckduckgo.com/html/",
-                    data={"q": query},
-                    headers=headers,
-                )
-                html = resp.text
+    seen_names = set()  # 去重
 
-                # HTML 接口结果结构：<a class="result__a">标题</a> + <a class="result__snippet">摘要</a>
-                titles = re.findall(
-                    r'<a[^>]*class="result__a"[^>]*>(.*?)</a>',
-                    html, re.DOTALL
-                )
-                snippets = re.findall(
-                    r'<a[^>]*class="result__snippet"[^>]*>(.*?)</a>',
-                    html, re.DOTALL
-                )
+    async with httpx.AsyncClient(timeout=5) as client:
+        for query in search_queries:
+            try:
+                # 尝试 V5 API
+                params = {
+                    "key": AMAP_KEY,
+                    "keywords": query["keywords"],
+                    "city": city,
+                    "citylimit": "true",
+                    "types": query["types"],
+                    "offset": 20,
+                    "page": 1,
+                }
 
-                # 方案 A 失败时，回退到 Instant Answer API（方案 B）
-                if not titles:
-                    resp_b = await client.get(
-                        "https://api.duckduckgo.com/",
-                        params={"q": query, "format": "json", "no_html": "1"},
-                        headers=headers,
+                resp = await client.get(
+                    "https://restapi.amap.com/v5/place/text",
+                    params=params,
+                )
+                data = resp.json()
+
+                # V5 返回结构：response.pois[]
+                pois = data.get("pois", [])
+
+                # 如果 V5 失败，降级到 V3
+                if not pois and data.get("status") != "1":
+                    resp_v3 = await client.get(
+                        "https://restapi.amap.com/v3/place/text",
+                        params=params,
                     )
-                    data_b = resp_b.json()
-                    titles, snippets = [], []
-                    # Instant Answer API 返回 RelatedTopics
-                    for topic in (data_b.get("RelatedTopics") or [])[:5]:
-                        if "Text" in topic:
-                            titles.append(topic.get("Text", "")[:80])
-                            snippets.append("")
-                        elif "Topics" in topic:
-                            for sub in topic["Topics"][:3]:
-                                titles.append(sub.get("Text", "")[:80])
-                                snippets.append("")
-                                if len(titles) >= 5:
-                                    break
+                    data_v3 = resp_v3.json()
+                    pois = data_v3.get("pois", [])
 
-                if titles:
-                    results = []
-                    for i, title in enumerate(titles[:5]):
-                        clean = re.sub(r'<[^>]+>', '', title).strip()
-                        if not clean:
-                            continue
-                        snippet = ""
-                        if i < len(snippets):
-                            snippet = re.sub(r'<[^>]+>', '', snippets[i]).strip()
-                        results.append(f"- {clean}")
-                        if snippet and len(snippet) < 200:
-                            results.append(f"  {snippet}")
-                    if results:
-                        all_results.append(f"【{query}】\n" + "\n".join(results))
-        except Exception:
-            continue
+                # 提取 POI 信息
+                for poi in pois[:10]:
+                    name = poi.get("name", "").strip()
+                    if not name or name in seen_names:
+                        continue
+                    seen_names.add(name)
+
+                    address = poi.get("address", "")
+                    if isinstance(address, list):
+                        address = "".join(address)
+                    address = address.strip() or "地址待定"
+
+                    location = poi.get("location", "")
+                    lat, lng = "", ""
+                    if location and "," in location:
+                        parts = location.split(",")
+                        if len(parts) == 2:
+                            lng, lat = parts[0], parts[1]
+
+                    poi_type = poi.get("type", "")
+                    if isinstance(poi_type, list):
+                        poi_type = "".join(poi_type)
+
+                    tel = poi.get("tel", "")
+                    if isinstance(tel, list):
+                        tel = "".join(tel)
+
+                    # 格式化输出
+                    result_line = f"- {name}"
+                    if address:
+                        result_line += f"（{address}）"
+                    if poi_type:
+                        result_line += f" - {poi_type}"
+                    if tel:
+                        result_line += f"，电话：{tel}"
+                    if lat and lng:
+                        result_line += f" [坐标：{lat},{lng}]"
+
+                    all_results.append(result_line)
+
+            except Exception as e:
+                logger.warning(f"高德 POI 搜索失败: {e}")
+                continue
 
     if not all_results:
         return ""
 
-    return "\n\n".join(all_results)
+    return "【高德地图 POI 搜索结果】\n" + "\n".join(all_results)
 
 
 REVIEW_SYSTEM_PROMPT = """你是一位经验丰富的活动运营专家。请根据提供的活动信息和复盘要点，生成一份结构化的复盘摘要。
