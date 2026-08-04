@@ -4,6 +4,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from config import ALGORITHM, SECRET_KEY
 from database import get_db
@@ -72,8 +73,12 @@ async def get_admin_user(current_user: User = Depends(get_current_user)) -> User
 # 共享业务辅助函数 — 消除 routers 间的重复代码
 # ---------------------------------------------------------------------------
 async def get_event_or_404(event_id: int, db: AsyncSession) -> Event:
-    """查询活动，不存在则抛出 404"""
-    result = await db.execute(select(Event).where(Event.id == event_id))
+    """查询活动（含组织者信息），不存在则抛出 404"""
+    result = await db.execute(
+        select(Event)
+        .options(selectinload(Event.organizer))
+        .where(Event.id == event_id)
+    )
     event = result.scalar_one_or_none()
     if not event:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="活动不存在")

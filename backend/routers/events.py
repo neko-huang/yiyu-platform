@@ -5,6 +5,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from config import logger
 from database import get_db
@@ -50,7 +51,7 @@ async def list_events(
     db: AsyncSession = Depends(get_db),
 ):
     """获取活动列表（支持分页、筛选）"""
-    query = select(Event)
+    query = select(Event).options(selectinload(Event.organizer))
 
     if status:
         query = query.where(Event.status == status)
@@ -131,7 +132,7 @@ async def search_events(
 
     公开接口，无需认证。默认只返回已发布(published/ongoing)的活动。
     """
-    query = select(Event).where(
+    query = select(Event).options(selectinload(Event.organizer)).where(
         Event.status.in_(["published", "ongoing"])
     )
 
@@ -220,7 +221,7 @@ async def get_recommendations(
     """
     # 获取已发布的活动作为候选集
     result = await db.execute(
-        select(Event).where(Event.status.in_(["published", "ongoing"]))
+        select(Event).options(selectinload(Event.organizer)).where(Event.status.in_(["published", "ongoing"]))
     )
     all_events = result.scalars().all()
 

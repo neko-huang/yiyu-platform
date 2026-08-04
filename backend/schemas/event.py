@@ -85,9 +85,20 @@ class EventUpdate(BaseModel):
         return self
 
 
+class EventOrganizerOut(BaseModel):
+    """活动组织者摘要信息"""
+    id: int
+    username: str
+    display_name: str | None = None
+    avatar_url: str | None = None
+
+    model_config = {"from_attributes": True}
+
+
 class EventOut(EventBase):
     id: int
     organizer_id: int
+    organizer: EventOrganizerOut | None = None
     current_participants: int = 0
     status: str = "draft"
     created_at: datetime | None = None

@@ -34,6 +34,7 @@ class Event(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
     # Relationships
+    organizer = relationship("User", foreign_keys=[organizer_id])
     registrations = relationship("Registration", back_populates="event", cascade="all, delete-orphan")
     finance_records = relationship("FinanceRecord", back_populates="event", cascade="all, delete-orphan")
     reviews = relationship("EventReview", back_populates="event", cascade="all, delete-orphan")
