@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import AMapLoader from '@amap/amap-jsapi-loader';
 
 export interface LocationResult {
   name: string;
@@ -14,99 +13,143 @@ interface LocationSearchProps {
   placeholder?: string;
 }
 
+interface SuggestionTip {
+  id: string;
+  name: string;
+  district: string;
+  adcode: string;
+  location: string;
+  address: string;
+  type: string;
+}
+
 export default function LocationSearch({ value, onSelect, placeholder }: LocationSearchProps) {
   const [inputValue, setInputValue] = useState(value);
-  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [suggestions, setSuggestions] = useState<SuggestionTip[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [searching, setSearching] = useState(false);
-  const [amapError, setAmapError] = useState('');
-  const [ready, setReady] = useState(false);
-  const autoCompleteRef = useRef<any>(null);
-  const placeSearchRef = useRef<any>(null);
+  const [errorMsg, setErrorMsg] = useState('');
   const debounceRef = useRef<number | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const amapLoadedRef = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
 
   const amapKey = import.meta.env.VITE_AMAP_KEY || '';
 
-  // 初始化 AMap 搜索服务（只跑一次）
-  useEffect(() => {
-    if (!amapKey) {
-      setAmapError('未配置高德地图 API Key');
-      return;
-    }
-    if (amapLoadedRef.current) return;
-    amapLoadedRef.current = true;
-
-    AMapLoader.load({
-      key: amapKey,
-      version: '2.0',
-      plugins: ['AMap.AutoComplete', 'AMap.PlaceSearch', 'AMap.Geocoder'],
-    }).then((AMap) => {
-      // 不限制城市，全国范围搜索
-      autoCompleteRef.current = new AMap.AutoComplete({ city: '', citylimit: false });
-      placeSearchRef.current = new AMap.PlaceSearch({ city: '', pageSize: 5 });
-      setReady(true);
-    }).catch((err) => {
-      // AMapLoader 可能已加载过但插件不全，尝试用 AMap.plugin 动态加载
-      if ((window as any).AMap) {
-        const AMap = (window as any).AMap;
-        AMap.plugin(['AMap.AutoComplete', 'AMap.PlaceSearch', 'AMap.Geocoder'], () => {
-          autoCompleteRef.current = new AMap.AutoComplete({ city: '', citylimit: false });
-          placeSearchRef.current = new AMap.PlaceSearch({ city: '', pageSize: 5 });
-          setReady(true);
-        });
-      } else {
-        setAmapError(`地图服务加载失败：${err.message || ''}`);
-      }
-    });
-  }, [amapKey]);
-
-  // 同步外部 value 变化（如地图选点后回填）
-  useEffect(() => {
-    setInputValue(value);
-  }, [value]);
-
-  // 搜索 POI
-  const doSearch = useCallback((keyword: string) => {
-    if (!keyword.trim() || !autoCompleteRef.current) {
+  // 使用高德地图 REST API 做搜索联想（不依赖 JS SDK 加载，稳定可靠）
+  const doSearch = useCallback(async (keyword: string) => {
+    if (!keyword.trim() || !amapKey) {
       setSuggestions([]);
       setShowDropdown(false);
       return;
     }
+
+    // 取消上一次未完成的请求
+    if (abortRef.current) {
+      abortRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setSearching(true);
-    autoCompleteRef.current.search(keyword, (status: string, result: any) => {
-      setSearching(false);
-      if (status === 'complete' && result?.tips?.length) {
-        setSuggestions(result.tips.slice(0, 10));
+    setErrorMsg('');
+
+    try {
+      // 高德地图 Web 服务 API：输入提示（搜索联想）
+      const url = `https://restapi.amap.com/v3/assistant/inputtips`
+        + `?key=${encodeURIComponent(amapKey)}`
+        + `&keywords=${encodeURIComponent(keyword)}`
+        + `&citylimit=false`
+        + `&datatype=poi`
+        + `&offset=10`;
+
+      const resp = await fetch(url, {
+        signal: controller.signal,
+        headers: { 'Accept': 'application/json' },
+      });
+
+      if (!resp.ok) {
+        throw new Error(`搜索服务返回 ${resp.status}`);
+      }
+
+      const data = await resp.json();
+
+      if (data.status === '1' && data.tips?.length) {
+        // 过滤掉没有 location 坐标的 tips（无法定位）
+        const validTips = data.tips.filter((t: any) => t.location);
+        setSuggestions(validTips.slice(0, 10));
+        // 始终打开下拉，这样当 validTips 为空时也能展示"未找到"提示
         setShowDropdown(true);
       } else {
-        // 如果 AutoComplete 没结果，尝试用 PlaceSearch 直接搜
-        if (placeSearchRef.current && keyword.length >= 2) {
-          placeSearchRef.current.search(keyword, (s: string, r: any) => {
-            if (s === 'complete' && r?.poiList?.pois?.length) {
-              const pois = r.poiList.pois.map((poi: any) => ({
-                id: poi.id,
-                name: poi.name,
-                address: poi.address,
-                district: poi.pname + poi.cityname + poi.adname,
-                location: poi.location.lng + ',' + poi.location.lat,
-                type: poi.type,
-              }));
-              setSuggestions(pois.slice(0, 10));
-              setShowDropdown(true);
-            } else {
-              setSuggestions([]);
-              setShowDropdown(false);
-            }
-          });
-        } else {
-          setSuggestions([]);
-          setShowDropdown(false);
+        setSuggestions([]);
+        // 打开下拉以展示"未找到匹配地点"的空状态提示
+        setShowDropdown(true);
+      }
+    } catch (err: any) {
+      if (err.name === 'AbortError') return; // 被取消，忽略
+      setErrorMsg('搜索服务异常，请稍后重试');
+      setSuggestions([]);
+      setShowDropdown(false);
+    } finally {
+      setSearching(false);
+    }
+  }, [amapKey]);
+
+  // 用 REST API 获取 POI 详情坐标
+  const fetchPoiDetail = useCallback(async (tip: SuggestionTip): Promise<LocationResult | null> => {
+    // 如果 location 已存在，直接解析
+    if (tip.location) {
+      const parts = tip.location.split(',');
+      if (parts.length === 2) {
+        const lng = parseFloat(parts[0]);
+        const lat = parseFloat(parts[1]);
+        if (!isNaN(lat) && !isNaN(lng)) {
+          return {
+            name: tip.name,
+            lat,
+            lng,
+            address: tip.district + (tip.address ? ` ${tip.address}` : ''),
+          };
         }
       }
-    });
-  }, []);
+    }
+
+    // 通过 id 获取详情（高德 POI 详情 API）
+    if (tip.id) {
+      try {
+        const url = `https://restapi.amap.com/v3/place/detail`
+          + `?key=${encodeURIComponent(amapKey)}`
+          + `&id=${encodeURIComponent(tip.id)}`;
+
+        const resp = await fetch(url);
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.status === '1' && data.pois?.length) {
+            const poi = data.pois[0];
+            const loc = poi.location;
+            if (loc) {
+              const parts = loc.split(',');
+              if (parts.length === 2) {
+                const lng = parseFloat(parts[0]);
+                const lat = parseFloat(parts[1]);
+                if (!isNaN(lat) && !isNaN(lng)) {
+                  return {
+                    name: poi.name || tip.name,
+                    lat,
+                    lng,
+                    address: (poi.pname || '') + (poi.cityname || '') + (poi.adname || '') + (poi.address || ''),
+                  };
+                }
+              }
+            }
+          }
+        }
+      } catch {
+        // 静默失败，返回 basic 信息
+      }
+    }
+
+    return null;
+  }, [amapKey]);
 
   // 输入变化 → 防抖触发搜索
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -114,7 +157,7 @@ export default function LocationSearch({ value, onSelect, placeholder }: Locatio
     setInputValue(val);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (val.trim().length >= 2) {
-      debounceRef.current = window.setTimeout(() => doSearch(val), 200);
+      debounceRef.current = window.setTimeout(() => doSearch(val), 300);
     } else {
       setSuggestions([]);
       setShowDropdown(false);
@@ -122,41 +165,40 @@ export default function LocationSearch({ value, onSelect, placeholder }: Locatio
   };
 
   // 选中建议 → 获取详细坐标并回调
-  const handleSelect = (tip: any) => {
+  const handleSelect = async (tip: SuggestionTip) => {
     setShowDropdown(false);
     setInputValue(tip.name);
 
-    // 如果已有完整坐标（PlaceSearch 直接搜到的）
-    if (tip.location) {
-      const parts = tip.location.split(',');
-      if (parts.length === 2) {
-        const lng = parseFloat(parts[0]);
-        const lat = parseFloat(parts[1]);
-        if (!isNaN(lat) && !isNaN(lng)) {
-          onSelect({ name: tip.name, lat, lng, address: tip.district || tip.address || tip.name });
-          return;
+    const result = await fetchPoiDetail(tip);
+    if (result) {
+      onSelect(result);
+    } else {
+      // 兜底：用 tip 里的基本信息
+      if (tip.location) {
+        const parts = tip.location.split(',');
+        if (parts.length === 2) {
+          const lng = parseFloat(parts[0]);
+          const lat = parseFloat(parts[1]);
+          if (!isNaN(lat) && !isNaN(lng)) {
+            onSelect({
+              name: tip.name,
+              lat,
+              lng,
+              address: tip.district + (tip.address ? ` ${tip.address}` : ''),
+            });
+            return;
+          }
         }
       }
-    }
-
-    // 通过 id 获取详情
-    if (placeSearchRef.current && tip.id) {
-      placeSearchRef.current.getDetails(tip.id, (status: string, result: any) => {
-        if (status === 'complete' && result?.poiList?.pois?.length) {
-          const poi = result.poiList.pois[0];
-          const loc = poi.location;
-          const lat = typeof loc.getLat === 'function' ? loc.getLat() : loc.lat;
-          const lng = typeof loc.getLng === 'function' ? loc.getLng() : loc.lng;
-          onSelect({
-            name: poi.name,
-            lat,
-            lng,
-            address: poi.pname + poi.cityname + poi.adname + (poi.address || ''),
-          });
-        }
-      });
+      // 最终兜底：无法获取坐标时给默认坐标并提示
+      setErrorMsg('无法获取该地点的精确坐标，请尝试其他关键词或在地图上选点');
     }
   };
+
+  // 同步外部 value 变化（如地图选点后回填）
+  useEffect(() => {
+    setInputValue(value);
+  }, [value]);
 
   // 点击外部关闭下拉
   useEffect(() => {
@@ -169,11 +211,31 @@ export default function LocationSearch({ value, onSelect, placeholder }: Locatio
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
+  // 组件卸载时清理
   useEffect(() => {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (abortRef.current) abortRef.current.abort();
     };
   }, []);
+
+  // 根据 type 取图标
+  const getTypeIcon = (type: string) => {
+    if (!type) return '📍';
+    const t = type.toLowerCase();
+    if (t.includes('餐饮') || t.includes('美食') || t.includes('咖啡')) return '🍽️';
+    if (t.includes('购物') || t.includes('商场')) return '🛒';
+    if (t.includes('风景') || t.includes('景点') || t.includes('公园')) return '🏞️';
+    if (t.includes('交通') || t.includes('地铁') || t.includes('公交')) return '🚇';
+    if (t.includes('酒店') || t.includes('住宿')) return '🏨';
+    if (t.includes('医疗') || t.includes('医院')) return '🏥';
+    if (t.includes('教育') || t.includes('学校') || t.includes('大学')) return '🏫';
+    if (t.includes('运动') || t.includes('健身')) return '🏃';
+    if (t.includes('娱乐') || t.includes('休闲')) return '🎮';
+    if (t.includes('宠物') || t.includes('动物')) return '🐾';
+    if (t.includes('社区') || t.includes('生活')) return '🏠';
+    return '📍';
+  };
 
   return (
     <div ref={wrapperRef} className="relative">
@@ -185,30 +247,28 @@ export default function LocationSearch({ value, onSelect, placeholder }: Locatio
           onChange={handleInputChange}
           onFocus={() => { if (suggestions.length > 0) setShowDropdown(true); }}
           className="input-field pl-10 pr-10"
-          placeholder={placeholder || '搜索地点名称，如：温榆河公园、朝阳大悦城'}
+          placeholder={placeholder || '搜索地点名称，如：天安门、温榆河公园、朝阳大悦城'}
         />
         {/* 右侧状态图标 */}
         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs">
           {searching ? (
             <span className="text-gray-400 animate-pulse">搜索中…</span>
-          ) : !ready ? (
-            <span className="text-gray-300">⏳</span>
-          ) : inputValue && !showDropdown ? null : (
+          ) : (
             <span className="text-gray-300">🔍</span>
           )}
         </span>
       </div>
 
-      {amapError && (
-        <p className="text-xs text-red-500 mt-1">{amapError}</p>
+      {errorMsg && (
+        <p className="text-xs text-red-500 mt-1">{errorMsg}</p>
       )}
 
-      {!ready && !amapError && (
-        <p className="text-xs text-gray-400 mt-1">正在加载地图搜索服务…</p>
+      {!amapKey && (
+        <p className="text-xs text-red-500 mt-1">未配置高德地图 API Key</p>
       )}
 
       {showDropdown && suggestions.length > 0 && (
-        <ul className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-72 overflow-y-auto">
+        <ul className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-80 overflow-y-auto">
           {suggestions.map((tip, idx) => (
             <li
               key={tip.id || idx}
@@ -216,7 +276,7 @@ export default function LocationSearch({ value, onSelect, placeholder }: Locatio
               className="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b border-gray-50 last:border-0 transition-colors"
             >
               <div className="flex items-start gap-2">
-                <span className="text-gray-400 mt-0.5 flex-shrink-0">📍</span>
+                <span className="text-base mt-0.5 flex-shrink-0">{getTypeIcon(tip.type)}</span>
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-medium text-gray-800 truncate">{tip.name}</div>
                   <div className="text-xs text-gray-400 mt-0.5 truncate">
@@ -233,7 +293,7 @@ export default function LocationSearch({ value, onSelect, placeholder }: Locatio
         </ul>
       )}
 
-      {showDropdown && suggestions.length === 0 && !searching && ready && inputValue.trim().length >= 2 && (
+      {showDropdown && suggestions.length === 0 && !searching && inputValue.trim().length >= 2 && (
         <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-center">
           <p className="text-sm text-gray-400">未找到匹配的地点</p>
           <p className="text-xs text-gray-300 mt-1">试试换个关键词搜索</p>
