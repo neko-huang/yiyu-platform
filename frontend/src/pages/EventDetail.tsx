@@ -76,7 +76,7 @@ export default function EventDetail() {
           client.get(`/events/${id}/registrations`),
           client.get(`/events/${id}/finance`),
         ]);
-        setRegistrations(regRes.data);
+        setRegistrations(regRes.data?.items || regRes.data || []);
         setFinanceRecords(finRes.data?.items || finRes.data || []);
       }
     } catch {

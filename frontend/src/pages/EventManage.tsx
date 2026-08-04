@@ -50,7 +50,7 @@ export default function EventManage() {
         client.get(`/events/${id}/finance`),
       ]);
       setEvent(eventRes.data);
-      setRegistrations(regRes.data);
+      setRegistrations(regRes.data?.items || regRes.data || []);
       setFinanceRecords(finRes.data?.items || finRes.data || []);
 
       // 尝试加载复盘报告（可能不存在）

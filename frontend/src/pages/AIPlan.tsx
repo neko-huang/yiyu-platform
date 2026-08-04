@@ -3,13 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import client from '../api/client';
 import { getErrorMessage } from '../utils/errors';
+import { useAuth } from '../contexts/AuthContext';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
 }
 
-const STORAGE_KEY = 'aiPlanMessages';
 const API_KEY_STORAGE_KEY = 'deepseekApiKey';
 const BASE_URL_STORAGE_KEY = 'deepseekBaseUrl';
 
@@ -20,24 +20,40 @@ const examplePrompts = [
   '帮我设计一个夏日音乐节活动方案',
 ];
 
-function loadMessages(): ChatMessage[] {
+function getStorageKey(userId: number | null): string {
+  return userId ? `aiPlanMessages_${userId}` : 'aiPlanMessages_guest';
+}
+
+function loadMessages(userId: number | null): ChatMessage[] {
+  const key = getStorageKey(userId);
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    // 迁移旧数据：如果用户有 ID 且旧 key 存在，迁移到新 key
+    if (userId) {
+      const oldData = localStorage.getItem('aiPlanMessages');
+      const newData = localStorage.getItem(key);
+      if (oldData && !newData) {
+        localStorage.setItem(key, oldData);
+        localStorage.removeItem('aiPlanMessages');
+      }
+    }
+    const saved = localStorage.getItem(key);
     if (saved) return JSON.parse(saved);
   } catch {}
   return [];
 }
 
-function saveMessages(messages: ChatMessage[]) {
+function saveMessages(messages: ChatMessage[], userId: number | null) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+    localStorage.setItem(getStorageKey(userId), JSON.stringify(messages));
   } catch {}
 }
 
 export default function AIPlan() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
-    const saved = loadMessages();
+    const saved = loadMessages(userId);
     if (saved.length > 0) return saved;
     return [{
       role: 'assistant',
@@ -61,8 +77,8 @@ export default function AIPlan() {
 
   // 消息变化时持久化
   useEffect(() => {
-    saveMessages(messages);
-  }, [messages]);
+    saveMessages(messages, userId);
+  }, [messages, userId]);
 
   // 组件卸载时清理定时器
   useEffect(() => {
@@ -80,7 +96,7 @@ export default function AIPlan() {
   };
 
   const clearChat = () => {
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(getStorageKey(userId));
     setMessages([{
       role: 'assistant',
       content: '你好！我是益屿AI活动策划助手 ✨\n\n告诉我你想举办什么样的活动，我将为你生成完整的活动方案。',
