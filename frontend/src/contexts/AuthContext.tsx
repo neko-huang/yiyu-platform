@@ -20,21 +20,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // 不自动登录，每次打开页面都需手动登录
-  // 每次刷新页面时清除旧 token，确保用户必须重新登录
+  // 页面刷新/重新打开时从 localStorage 恢复登录态
   useEffect(() => {
-    let isMounted = true;
-
-    // 清除旧登录态，确保每次打开页面都需手动登录
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    setToken(null);
-    setUser(null);
+    const savedToken = localStorage.getItem('token');
+    const savedUser = localStorage.getItem('user');
+    if (savedToken && savedUser) {
+      try {
+        setToken(savedToken);
+        setUser(JSON.parse(savedUser));
+      } catch {
+        // 数据损坏则清除
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      }
+    }
     setLoading(false);
-
-    return () => {
-      isMounted = false;
-    };
   }, []);
 
   // 监听 401 拦截器派发的登出事件（替代 window.location 硬跳转）

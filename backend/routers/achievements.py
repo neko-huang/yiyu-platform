@@ -193,39 +193,47 @@ async def get_leaderboard(
     limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
 ):
-    """积分排行榜"""
-    # 按用户聚合积分
-    q = (
+    """积分排行榜 — 包含所有用户（积分0也显示）"""
+    # 先获取所有用户
+    users_q = select(User).order_by(User.id)
+    users_result = await db.execute(users_q)
+    all_users = users_result.scalars().all()
+
+    # 获取每个用户的积分合计
+    points_q = (
         select(
             PointTransaction.user_id,
             func.sum(PointTransaction.points).label("total_points"),
         )
         .group_by(PointTransaction.user_id)
-        .order_by(sa_desc("total_points"))
-        .limit(limit)
     )
-    result = await db.execute(q)
-    rows = result.all()
+    points_result = await db.execute(points_q)
+    points_map = {row.user_id: row.total_points for row in points_result.all()}
 
-    if not rows:
-        return []
-
-    # 批量获取用户信息
-    user_ids = [r.user_id for r in rows]
-    users_q = select(User).where(User.id.in_(user_ids))
-    users_result = await db.execute(users_q)
-    users_map = {u.id: u for u in users_result.scalars().all()}
-
+    # 合并所有用户，积分0的也显示
     entries = []
-    for rank, row in enumerate(rows, start=1):
-        user = users_map.get(row.user_id)
-        entries.append(
+    for user in all_users:
+        total = points_map.get(user.id, 0)
+        entries.append({
+            "user_id": user.id,
+            "display_name": user.display_name or user.username,
+            "avatar_url": user.avatar_url,
+            "total_points": total,
+        })
+
+    # 按积分降序排列
+    entries.sort(key=lambda e: (-e["total_points"], e["user_id"]))
+
+    # 取前 limit 名，赋予排名
+    result = []
+    for rank, entry in enumerate(entries[:limit], start=1):
+        result.append(
             LeaderboardEntry(
-                user_id=row.user_id,
-                display_name=(user.display_name or user.username) if user else f"用户{row.user_id}",
-                avatar_url=user.avatar_url if user else None,
-                total_points=row.total_points,
+                user_id=entry["user_id"],
+                display_name=entry["display_name"],
+                avatar_url=entry["avatar_url"],
+                total_points=entry["total_points"],
                 rank=rank,
             )
         )
-    return entries
+    return result

@@ -25,19 +25,19 @@ export default function MapPage() {
   const fetchEvents = useCallback(async () => {
     setLoading(true);
     try {
-      // 先用 /events/map 获取有经纬度的活动
+      // 先用 /events/map 获取有经纬度的活动（排除线上活动）
       const mapRes = await client.get('/events/map');
       const mapItems = Array.isArray(mapRes.data) ? mapRes.data : [];
-      // 再用 /events?status=published 获取完整活动信息（含价格/人数等）
-      const fullRes = await client.get('/events', { params: { status: 'published' } });
+      // 再用 /events?status=published&page_size=100 获取完整活动信息
+      const fullRes = await client.get('/events', { params: { status: 'published', page_size: 100 } });
       const fullItems: Event[] = fullRes.data.items || [];
-      // 合并：只保留有经纬度的活动，用 map 信息补充完整数据
+      // 合并：只保留有经纬度的活动，排除线上活动
       const mapIds = new Set(mapItems.map((m: { id: number }) => m.id));
-      const merged = fullItems.filter((e) => mapIds.has(e.id));
-      setEvents(merged.length > 0 ? merged : mapItems);
+      const merged = fullItems.filter((e) => mapIds.has(e.id) && e.type !== 'online');
+      setEvents(merged.length > 0 ? merged : mapItems.filter((m: { type?: string }) => m.type !== 'online'));
     } catch {
-      // 后端未启动，使用模拟数据
-      setEvents(mockEvents);
+      // 后端未启动，使用模拟数据（排除线上活动）
+      setEvents(mockEvents.filter((e) => e.type !== 'online'));
     } finally {
       setLoading(false);
     }

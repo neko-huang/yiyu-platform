@@ -63,7 +63,18 @@ export default function AIPlan() {
   });
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [currentPlan, setCurrentPlan] = useState('');
+  const [currentPlan, setCurrentPlan] = useState(() => {
+    // 从已恢复的消息中找到最后一个 assistant 回复作为 currentPlan
+    const saved = loadMessages(userId);
+    if (saved.length > 0) {
+      for (let i = saved.length - 1; i >= 0; i--) {
+        if (saved[i].role === 'assistant' && saved[i].content.length > 50) {
+          return saved[i].content;
+        }
+      }
+    }
+    return '';
+  });
   const [errorMsg, setErrorMsg] = useState('');
   const [showSettings, setShowSettings] = useState(false);
   const [apiKey, setApiKey] = useState(() => localStorage.getItem(API_KEY_STORAGE_KEY) || '');

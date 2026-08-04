@@ -103,22 +103,25 @@ export default function EventDetail() {
     setRegistering(true);
     setRegisterError('');
     try {
-      await client.post(`/events/${id}/register`);
-      setRegistrationStatus('pending');
+      const res = await client.post(`/events/${id}/register`, {});
+      // MVP 阶段自动通过，注册状态为 approved
+      const regStatus = res.data?.status || 'approved';
+      setRegistrationStatus(regStatus);
       // 更新报名人数
       if (event) {
         setEvent({ ...event, current_participants: event.current_participants + 1 });
       }
     } catch (err) {
-      // 检查是否为 403（已报名）或 409（名额已满）
-      const status = err instanceof Error ? (err as { response?: { status?: number } }).response?.status : undefined;
-      if (status === 403) {
-        setRegisterError('您已报名此活动或无权报名');
-      } else if (status === 409) {
-        setRegisterError('名额已满');
+      // 检查是否为 409（已报名）或名额已满
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || '';
+      if (status === 409) {
+        setRegisterError(detail || '您已报名此活动');
+      } else if (status === 400) {
+        setRegisterError(detail || '活动未开放报名或名额已满');
       } else {
         // 后端未启动 - 模拟成功
-        setRegistrationStatus('pending');
+        setRegistrationStatus('approved');
         if (event) {
           setEvent({ ...event, current_participants: event.current_participants + 1 });
         }

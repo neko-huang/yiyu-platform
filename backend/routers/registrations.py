@@ -30,7 +30,7 @@ router = APIRouter(tags=["报名"])
 )
 async def register_for_event(
     event_id: int,
-    payload: RegistrationCreate,
+    payload: RegistrationCreate | None = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -48,7 +48,7 @@ async def register_for_event(
         )
     )
     if existing.scalar_one_or_none():
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="已报名此活动")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="已报名此活动，请勿重复报名")
 
     # 检查人数上限 — current_participants 维护的是 approved + checked_in 计数
     if event.max_participants and event.current_participants >= event.max_participants:
@@ -59,12 +59,12 @@ async def register_for_event(
         event_id=event_id,
         user_id=current_user.id,
         status="approved",
-        form_data=payload.form_data,
+        form_data=payload.form_data if payload else {},
     )
     db.add(reg)
     # 更新活动参与人数
     event.current_participants += 1
-    await db.flush()
+    await db.commit()
     await db.refresh(reg)
     logger.info("用户 %s 报名活动 %s（当前 %s 人）", current_user.id, event_id, event.current_participants)
     return RegistrationOut.model_validate(reg)
