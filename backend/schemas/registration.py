@@ -43,3 +43,42 @@ class RegistrationListOut(BaseModel):
     page: int
     page_size: int
     items: list[RegistrationWithUserOut]
+class MyRegistrationEvent(BaseModel):
+    """报名记录中的活动简略信息"""
+    id: int
+    title: str
+    description: str | None = None
+    type: str = "offline"
+    category: str | None = None
+    start_time: datetime | None = None
+    end_time: datetime | None = None
+    location_name: str | None = None
+    status: str = "draft"
+    cover_image: str | None = None
+    tags: list[str] = []
+    current_participants: int = 0
+    max_participants: int | None = None
+    price: float = 0.0
+
+    model_config = {"from_attributes": True}
+
+
+class MyRegistrationOut(BaseModel):
+    """我的报名记录（含活动信息）"""
+    id: int
+    event_id: int
+    status: str
+    form_data: dict = {}
+    checked_in_at: datetime | None = None
+    created_at: datetime | None = None
+    event: MyRegistrationEvent
+
+    model_config = {"from_attributes": True}
+
+
+class MyRegistrationListOut(BaseModel):
+    """我的报名列表分页响应"""
+    total: int
+    page: int
+    page_size: int
+    items: list[MyRegistrationOut]

@@ -320,3 +320,29 @@ export interface PointsSummary {
   achievements: UserAchievement[];
   recent_transactions: PointTransaction[];
 }
+export interface MyRegistrationEvent {
+  id: number;
+  title: string;
+  description: string | null;
+  type: string;
+  category: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  location_name: string | null;
+  status: string;
+  cover_image: string | null;
+  tags: string[];
+  current_participants: number;
+  max_participants: number | null;
+  price: number;
+}
+
+export interface MyRegistration {
+  id: number;
+  event_id: number;
+  status: string;
+  form_data: Record<string, unknown>;
+  checked_in_at: string | null;
+  created_at: string | null;
+  event: MyRegistrationEvent;
+}

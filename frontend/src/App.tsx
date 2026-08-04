@@ -21,6 +21,7 @@ const SOPPage = lazy(() => import('./pages/SOPPage'));
 const AlbumPage = lazy(() => import('./pages/AlbumPage'));
 const DiscussionPage = lazy(() => import('./pages/DiscussionPage'));
 const AchievementPage = lazy(() => import('./pages/AchievementPage'));
+const MyEventsPage = lazy(() => import('./pages/MyEventsPage'));
 
 /** 全局加载占位符 */
 function PageLoading() {
@@ -64,6 +65,7 @@ function App() {
         <Route path="/events/:id/discussion" element={<Suspense fallback={<PageLoading />}><DiscussionPage /></Suspense>} />
         <Route path="/achievements" element={<Suspense fallback={<PageLoading />}><AchievementPage /></Suspense>} />
         <Route path="/profile" element={<Suspense fallback={<PageLoading />}><ProfilePage /></Suspense>} />
+        <Route path="/my-events" element={<Suspense fallback={<PageLoading />}><MyEventsPage /></Suspense>} />
 
         {/* 管理端路由 */}
         <Route

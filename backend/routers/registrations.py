@@ -5,12 +5,15 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from config import logger
 from database import get_db
 from models import Event, Registration, User
 from routers.dependencies import check_organizer, get_current_user, get_event_or_404
 from schemas.registration import (
+    MyRegistrationListOut,
+    MyRegistrationOut,
     RegistrationCreate,
     RegistrationListOut,
     RegistrationOut,
@@ -195,3 +198,30 @@ async def _get_registration_with_event(reg_id: int, db: AsyncSession) -> tuple[R
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="报名记录不存在")
     return row[0], row[1]
+@router.get("/my/registrations", response_model=MyRegistrationListOut)
+async def list_my_registrations(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """获取当前用户报名（含已通过/已签到）的活动列表"""
+    base_query = (
+        select(Registration)
+        .options(selectinload(Registration.event))
+        .where(Registration.user_id == current_user.id)
+        .order_by(Registration.created_at.desc())
+    )
+    count_query = select(func.count()).select_from(Registration).where(Registration.user_id == current_user.id)
+    total = (await db.execute(count_query)).scalar() or 0
+
+    query = base_query.offset((page - 1) * page_size).limit(page_size)
+    result = await db.execute(query)
+    items = list(result.scalars().all())
+
+    return MyRegistrationListOut(
+        total=total,
+        page=page,
+        page_size=page_size,
+        items=[MyRegistrationOut.model_validate(r) for r in items],
+    )

@@ -208,12 +208,18 @@ export default function SearchPage() {
                 setQuery('');
                 handleFilterChange();
               }}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="absolute right-16 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
               aria-label="清空搜索"
             >
               ✕
             </button>
           )}
+          <button
+            type="submit"
+            className="absolute right-3 top-1/2 -translate-y-1/2 bg-primary-500 text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-primary-600 transition-colors"
+          >
+            搜索
+          </button>
         </div>
       </form>
 

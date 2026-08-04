@@ -322,3 +322,14 @@ export async function getLeaderboard(): Promise<Array<{ user_id: number; usernam
 }
 
 export { client as default };
+/** 获取我创建的活动 */
+export async function getMyEvents(): Promise<SearchResult> {
+  const res = await client.get<SearchResult>('/events/my');
+  return res.data;
+}
+
+/** 获取我报名的活动（含活动详情） */
+export async function getMyRegistrations(): Promise<{ total: number; page: number; page_size: number; items: MyRegistration[] }> {
+  const res = await client.get('/my/registrations');
+  return res.data;
+}

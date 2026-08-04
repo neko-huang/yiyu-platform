@@ -448,3 +448,29 @@ async def archive_event(
     await db.flush()
     await db.refresh(event)
     return EventOut.model_validate(event)
+@router.get("/my", response_model=EventListOut)
+async def list_my_events(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """获取当前用户创建的活动"""
+    base_query = (
+        select(Event)
+        .where(Event.organizer_id == current_user.id)
+        .order_by(Event.created_at.desc())
+    )
+    count_query = select(func.count()).select_from(Event).where(Event.organizer_id == current_user.id)
+    total = (await db.execute(count_query)).scalar() or 0
+
+    query = base_query.offset((page - 1) * page_size).limit(page_size)
+    result = await db.execute(query)
+    items = list(result.scalars().all())
+
+    return EventListOut(
+        total=total,
+        page=page,
+        page_size=page_size,
+        items=[EventOut.model_validate(e) for e in items],
+    )
