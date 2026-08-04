@@ -36,6 +36,7 @@ async def generate_plan(
             api_key=api_key, base_url=base_url,
             city=payload.city,
             messages=payload.messages,
+            edited_plan=payload.edited_plan,
         )
     except httpx.HTTPStatusError as e:
         logger.warning("AI 服务返回错误: %s", e.response.status_code)

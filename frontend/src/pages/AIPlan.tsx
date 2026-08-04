@@ -80,6 +80,8 @@ export default function AIPlan() {
   const [apiKey, setApiKey] = useState(() => localStorage.getItem(API_KEY_STORAGE_KEY) || '');
   const [baseUrl, setBaseUrl] = useState(() => localStorage.getItem(BASE_URL_STORAGE_KEY) || 'https://api.deepseek.com');
   const [city, setCity] = useState(() => localStorage.getItem('aiPlanCity') || '');
+  const [isEditingPlan, setIsEditingPlan] = useState(false);
+  const [editedPlan, setEditedPlan] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -128,6 +130,8 @@ export default function AIPlan() {
       content: '你好！我是益屿AI活动策划助手 ✨\n\n告诉我你想举办什么样的活动，我将为你生成完整的活动方案。',
     }]);
     setCurrentPlan('');
+    setEditedPlan(null);
+    setIsEditingPlan(false);
   };
 
   const handleSend = async (e?: FormEvent) => {
@@ -154,6 +158,11 @@ export default function AIPlan() {
     }));
     payload.messages = historyMessages;
 
+    // 如果用户编辑过方案，把编辑后的方案作为样本传给 AI
+    if (editedPlan && editedPlan !== currentPlan) {
+      payload.edited_plan = editedPlan;
+    }
+
     let lastError: unknown = null;
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -168,6 +177,9 @@ export default function AIPlan() {
         const newMessages = [...updatedMessages, { role: 'assistant' as const, content: planContent }];
         setMessages(newMessages);
         setCurrentPlan(planContent);
+        // 新方案生成后，重置 editedPlan，避免下一轮误传旧编辑
+        setEditedPlan(null);
+        setIsEditingPlan(false);
         setErrorMsg('');
         return; // 成功，退出
       } catch (err) {
@@ -182,6 +194,8 @@ export default function AIPlan() {
             const newMessages = [...updatedMessages, { role: 'assistant' as const, content: mockPlan }];
             setMessages(newMessages);
             setCurrentPlan(mockPlan);
+            setEditedPlan(null);
+            setIsEditingPlan(false);
             timeoutRef.current = null;
           }, 1500);
           return;
@@ -279,8 +293,10 @@ export default function AIPlan() {
   };
 
   const handleConvertToEvent = () => {
-    if (!currentPlan) return;
-    const parsed = parseAIPlan(currentPlan);
+    // 优先使用用户编辑后的方案，否则使用 AI 生成的原始方案
+    const planToUse = (editedPlan && editedPlan.trim()) ? editedPlan : currentPlan;
+    if (!planToUse) return;
+    const parsed = parseAIPlan(planToUse);
     // 同时存入 sessionStorage 和 localStorage，确保数据不丢失
     sessionStorage.setItem('aiPlanData', JSON.stringify(parsed));
     localStorage.setItem('aiPlanData', JSON.stringify(parsed));
@@ -452,14 +468,43 @@ export default function AIPlan() {
 
         {/* Plan preview sidebar */}
         <div className="w-96 border-l border-gray-200 bg-gray-50 hidden xl:flex flex-col">
-          <div className="px-4 py-3 border-b border-gray-200 bg-white">
+          <div className="px-4 py-3 border-b border-gray-200 bg-white flex items-center justify-between">
             <h2 className="font-semibold text-gray-900 text-sm">📄 方案预览</h2>
+            {currentPlan && (
+              <button
+                onClick={() => {
+                  if (isEditingPlan) {
+                    // 保存编辑
+                    const textarea = document.getElementById('plan-editor') as HTMLTextAreaElement;
+                    if (textarea) {
+                      setEditedPlan(textarea.value);
+                    }
+                    setIsEditingPlan(false);
+                  } else {
+                    // 进入编辑模式
+                    setEditedPlan(currentPlan);
+                    setIsEditingPlan(true);
+                  }
+                }}
+                className="text-xs text-primary-600 hover:text-primary-800"
+              >
+                {isEditingPlan ? '💾 保存编辑' : '✏️ 编辑'}
+              </button>
+            )}
           </div>
           <div className="flex-1 overflow-y-auto p-4">
             {currentPlan ? (
-              <div className="prose prose-sm max-w-none">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{currentPlan}</ReactMarkdown>
-              </div>
+              isEditingPlan ? (
+                <textarea
+                  id="plan-editor"
+                  className="w-full h-full min-h-[400px] text-sm font-mono border border-gray-300 rounded-lg p-3 resize-none focus:outline-none focus:ring-1 focus:ring-primary-500"
+                  defaultValue={editedPlan ?? currentPlan}
+                />
+              ) : (
+                <div className="prose prose-sm max-w-none">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{currentPlan}</ReactMarkdown>
+                </div>
+              )
             ) : (
               <div className="text-center text-gray-400 mt-12">
                 <div className="text-4xl mb-3" aria-hidden="true">📝</div>

@@ -173,24 +173,8 @@ export default function LocationSearch({ value, onSelect, placeholder }: Locatio
     if (result) {
       onSelect(result);
     } else {
-      // 兜底：用 tip 里的基本信息
-      if (tip.location) {
-        const parts = tip.location.split(',');
-        if (parts.length === 2) {
-          const lng = parseFloat(parts[0]);
-          const lat = parseFloat(parts[1]);
-          if (!isNaN(lat) && !isNaN(lng)) {
-            onSelect({
-              name: tip.name,
-              lat,
-              lng,
-              address: tip.district + (tip.address ? ` ${tip.address}` : ''),
-            });
-            return;
-          }
-        }
-      }
-      // 最终兜底：无法获取坐标时给默认坐标并提示
+      // fetchPoiDetail 内部已尝试解析 tip.location 和通过 id 获取详情
+      // 均失败则直接提示用户，无需再重复解析 tip.location
       setErrorMsg('无法获取该地点的精确坐标，请尝试其他关键词或在地图上选点');
     }
   };

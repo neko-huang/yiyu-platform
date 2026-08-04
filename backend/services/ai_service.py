@@ -1,5 +1,7 @@
 """DeepSeek AI 服务封装"""
 
+import re
+
 import httpx
 
 from config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL
@@ -129,8 +131,11 @@ async def _call_deepseek(
         for msg in messages:
             if msg.get("role") in ("user", "assistant"):
                 api_messages.append(msg)
-        # 如果最后一条不是 user 消息，追加当前用户输入
-        if not api_messages or api_messages[-1].get("role") != "user":
+        # 用增强后的 user_content（含 city/edited_plan/venue 信息）替换最后一条 user 消息
+        # 避免丢失 generate_event_plan 中构建的丰富上下文
+        if api_messages and api_messages[-1].get("role") == "user":
+            api_messages[-1] = {"role": "user", "content": user_content}
+        else:
             api_messages.append({"role": "user", "content": user_content})
     else:
         api_messages = [
@@ -163,6 +168,7 @@ async def generate_event_plan(
     base_url: str | None = None,
     city: str | None = None,
     messages: list[dict] | None = None,
+    edited_plan: str | None = None,
 ) -> str:
     """
     调用 DeepSeek API 生成活动方案。
@@ -172,21 +178,134 @@ async def generate_event_plan(
         mode: "direct" 直接生成 / "guided" 引导式（暂同 direct）
         city: 用户所在城市
         messages: 对话历史，用于多轮对话上下文
+        edited_plan: 用户手动编辑后的方案，作为调整样本
 
     Returns:
         生成的 Markdown 方案文本
     """
-    city_info = f"\n活动所在城市：{city}" if city else ""
-    user_content = (
-        f"请为以下活动想法生成一份详细、具体的活动方案：\n\n"
-        f"用户想法：{idea}{city_info}\n\n"
-        "请严格遵循系统提示中的要求，深度差异化、场地具体化、杜绝通用模板。"
+    # 1. 构建用户输入
+    parts = [f"请为以下活动想法生成一份详细、具体的活动方案：\n\n"]
+    parts.append(f"用户想法：{idea}")
+
+    # 2. 城市信息
+    if city:
+        parts.append(f"\n活动所在城市：{city}")
+
+    # 3. 如果用户编辑过方案，作为样本传给 AI
+    if edited_plan:
+        parts.append(
+            f"\n\n## 📝 用户手动修改后的方案（请基于此版本继续调整，保持一致性和连贯性）\n\n"
+            f"{edited_plan}\n\n"
+            f"请基于以上修改后的方案版本进行细化和调整，保持活动名称、核心创意的一致，"
+            f"只在需要修改的方面进行调整。不要重新生成一套全新的方案。"
+        )
+
+    # 4. 搜索益屿周边真实场地（增强联网能力）
+    if city:
+        try:
+            venue_info = await _search_venues(city)
+            if venue_info:
+                parts.append(
+                    f"\n\n## 🌐 联网搜索到的 {city} 及周边真实场地信息（请优先参考）\n\n"
+                    f"{venue_info}\n\n"
+                    "以上是联网搜索到的真实场地信息，请作为场地推荐的核心参考。"
+                )
+        except Exception:
+            pass  # 搜索失败不影响主流程
+
+    parts.append(
+        "\n\n请严格遵循系统提示中的要求，深度差异化、场地具体化、杜绝通用模板。"
     )
+    user_content = "".join(parts)
+
     return await _call_deepseek(
         SYSTEM_PROMPT, user_content,
         api_key=api_key, base_url=base_url,
         messages=messages,
     )
+
+
+async def _search_venues(city: str) -> str:
+    """搜索指定城市的活动场地和场馆信息，返回格式化文本
+
+    使用 DuckDuckGo HTML 搜索接口（POST），比 Lite 接口更稳定。
+    备选：DuckDuckGo Instant Answer API（GET）。
+    """
+    search_queries = [
+        f"{city} 活动场地 场馆 出租 包场",
+        f"{city} 咖啡馆 活动空间 文创园区",
+        f"{city} 宠物友好 公园 户外 活动场地",
+    ]
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                       "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    }
+
+    all_results = []
+    for query in search_queries:
+        try:
+            async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+                # 方案 A：DuckDuckGo HTML 搜索（POST，更稳定）
+                resp = await client.post(
+                    "https://html.duckduckgo.com/html/",
+                    data={"q": query},
+                    headers=headers,
+                )
+                html = resp.text
+
+                # HTML 接口结果结构：<a class="result__a">标题</a> + <a class="result__snippet">摘要</a>
+                titles = re.findall(
+                    r'<a[^>]*class="result__a"[^>]*>(.*?)</a>',
+                    html, re.DOTALL
+                )
+                snippets = re.findall(
+                    r'<a[^>]*class="result__snippet"[^>]*>(.*?)</a>',
+                    html, re.DOTALL
+                )
+
+                # 方案 A 失败时，回退到 Instant Answer API（方案 B）
+                if not titles:
+                    resp_b = await client.get(
+                        "https://api.duckduckgo.com/",
+                        params={"q": query, "format": "json", "no_html": "1"},
+                        headers=headers,
+                    )
+                    data_b = resp_b.json()
+                    titles, snippets = [], []
+                    # Instant Answer API 返回 RelatedTopics
+                    for topic in (data_b.get("RelatedTopics") or [])[:5]:
+                        if "Text" in topic:
+                            titles.append(topic.get("Text", "")[:80])
+                            snippets.append("")
+                        elif "Topics" in topic:
+                            for sub in topic["Topics"][:3]:
+                                titles.append(sub.get("Text", "")[:80])
+                                snippets.append("")
+                                if len(titles) >= 5:
+                                    break
+
+                if titles:
+                    results = []
+                    for i, title in enumerate(titles[:5]):
+                        clean = re.sub(r'<[^>]+>', '', title).strip()
+                        if not clean:
+                            continue
+                        snippet = ""
+                        if i < len(snippets):
+                            snippet = re.sub(r'<[^>]+>', '', snippets[i]).strip()
+                        results.append(f"- {clean}")
+                        if snippet and len(snippet) < 200:
+                            results.append(f"  {snippet}")
+                    if results:
+                        all_results.append(f"【{query}】\n" + "\n".join(results))
+        except Exception:
+            continue
+
+    if not all_results:
+        return ""
+
+    return "\n\n".join(all_results)
 
 
 REVIEW_SYSTEM_PROMPT = """你是一位经验丰富的活动运营专家。请根据提供的活动信息和复盘要点，生成一份结构化的复盘摘要。

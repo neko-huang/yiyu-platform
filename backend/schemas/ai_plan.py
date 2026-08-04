@@ -14,6 +14,7 @@ class AIPlanGenerateRequest(BaseModel):
     base_url: str | None = None
     city: str | None = Field(None, max_length=100, description="用户所在城市")
     messages: list[dict] | None = Field(None, description="对话历史，用于多轮对话上下文")
+    edited_plan: str | None = Field(None, description="用户手动编辑后的方案，作为下一轮调整的样本")
 
 
 class AIPlanGenerateResponse(BaseModel):
