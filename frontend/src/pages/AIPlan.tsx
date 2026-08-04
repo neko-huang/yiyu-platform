@@ -212,6 +212,7 @@ export default function AIPlan() {
             </button>
           </div>
         </div>
+        </div>
       </div>
 
       {/* Settings panel */}
