@@ -29,11 +29,20 @@ export default function CreateEvent() {
     if (aiPlan) {
       sessionStorage.removeItem('aiPlanContent');
     }
+    // 从 sessionStorage 读取 SOP 模板内容预填
+    const sopRaw = sessionStorage.getItem('sopTemplateContent');
+    let sopData: { title?: string; description?: string; tags?: string; category?: string } | null = null;
+    if (sopRaw) {
+      try {
+        sopData = JSON.parse(sopRaw);
+        sessionStorage.removeItem('sopTemplateContent');
+      } catch { /* ignore */ }
+    }
     return {
-      title: '',
-      description: aiPlan || '',
+      title: sopData?.title || '',
+      description: sopData?.description || aiPlan || '',
       type: 'offline',
-      category: '户外',
+      category: sopData?.category || '户外',
       start_time: '',
       end_time: '',
       location_name: '',
@@ -41,7 +50,7 @@ export default function CreateEvent() {
       longitude: 116.4074,
       max_participants: 50,
       price: 0,
-      tags: '',
+      tags: sopData?.tags || '',
     };
   });
 

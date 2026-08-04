@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import client, {
   getSOPTemplates,
   createSOPTemplate,
@@ -40,6 +40,7 @@ const mockTemplates: SOPTemplate[] = [
 ];
 
 export default function SOPPage() {
+  const navigate = useNavigate();
   const [view, setView] = useState<ViewMode>('list');
   const [templates, setTemplates] = useState<SOPTemplate[]>(mockTemplates);
   const [selectedTemplate, setSelectedTemplate] = useState<SOPTemplate | null>(null);
@@ -117,6 +118,14 @@ export default function SOPPage() {
     setTemplates(templates.map(t =>
       t.id === template.id ? { ...t, usage_count: t.usage_count + 1 } : t
     ));
+    // 将模板内容写入 sessionStorage，跳转到创建活动页面预填
+    sessionStorage.setItem('sopTemplateContent', JSON.stringify({
+      title: template.name.replace(' SOP', ''),
+      description: template.content,
+      tags: (template.tags || []).join(', '),
+      category: template.category,
+    }));
+    navigate('/events/create');
   };
 
   const handleViewDetail = (template: SOPTemplate) => {
