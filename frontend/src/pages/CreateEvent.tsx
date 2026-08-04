@@ -429,7 +429,7 @@ export default function CreateEvent() {
         <div className="flex gap-3 justify-end">
           <Link to="/" className="btn-secondary">取消</Link>
           <button type="submit" disabled={loading} className="btn-primary">
-            {loading ? '保存中...' : '保存为草稿'}
+            {loading ? '发布中...' : '发布活动'}
           </button>
         </div>
       </form>

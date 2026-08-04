@@ -13,6 +13,16 @@ interface MapViewProps {
   focusedEventId?: number | null;
 }
 
+/** Escape special characters to prevent XSS in HTML strings */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export default function MapView({
   events = [],
   center = [35.86166, 104.195397],
@@ -69,9 +79,9 @@ export default function MapView({
             });
             const infoContent = `
               <div style="padding:4px 0;min-width:200px;font-family:system-ui,sans-serif;">
-                <h3 style="font-weight:600;font-size:14px;margin:0 0 4px;color:#111;">${event.title}</h3>
-                <p style="font-size:12px;color:#666;margin:0 0 4px;">📍 ${event.location_name || ''}</p>
-                <p style="font-size:12px;color:#666;margin:0 0 8px;">${new Date(event.start_time).toLocaleString('zh-CN')}</p>
+                <h3 style="font-weight:600;font-size:14px;margin:0 0 4px;color:#111;">${escapeHtml(event.title)}</h3>
+                <p style="font-size:12px;color:#666;margin:0 0 4px;">📍 ${escapeHtml(event.location_name || '')}</p>
+                <p style="font-size:12px;color:#666;margin:0 0 8px;">${escapeHtml(new Date(event.start_time).toLocaleString('zh-CN'))}</p>
                 <a href="/events/${event.id}" style="font-size:12px;color:#2563eb;text-decoration:none;font-weight:500;">查看详情 →</a>
               </div>
             `;

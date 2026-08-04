@@ -340,6 +340,7 @@ async def list_my_events(
     """获取当前用户创建的活动"""
     base_query = (
         select(Event)
+        .options(selectinload(Event.organizer))
         .where(Event.organizer_id == current_user.id)
         .order_by(Event.created_at.desc())
     )

@@ -33,7 +33,7 @@ export default function MyEventsPage() {
     } finally {
       setCreatedLoading(false);
     }
-  }, []);
+  }, [user?.id]);
 
   const loadRegistered = useCallback(async () => {
     setRegLoading(true);

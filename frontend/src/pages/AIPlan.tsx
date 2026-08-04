@@ -82,6 +82,7 @@ export default function AIPlan() {
   const [city, setCity] = useState(() => localStorage.getItem('aiPlanCity') || '');
   const [isEditingPlan, setIsEditingPlan] = useState(false);
   const [editedPlan, setEditedPlan] = useState<string | null>(null);
+  const [copyToast, setCopyToast] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -292,6 +293,24 @@ export default function AIPlan() {
     return { title, description: markdown, tags, category, max_participants: maxParticipants };
   };
 
+  const handleCopyPlan = async () => {
+    const planToUse = (editedPlan && editedPlan.trim()) ? editedPlan : currentPlan;
+    if (!planToUse) return;
+    try {
+      await navigator.clipboard.writeText(planToUse);
+    } catch {
+      // Fallback for older browsers
+      const textarea = document.createElement('textarea');
+      textarea.value = planToUse;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+    }
+    setCopyToast(true);
+    setTimeout(() => setCopyToast(false), 2000);
+  };
+
   const handleConvertToEvent = () => {
     // 优先使用用户编辑后的方案，否则使用 AI 生成的原始方案
     const planToUse = (editedPlan && editedPlan.trim()) ? editedPlan : currentPlan;
@@ -385,6 +404,13 @@ export default function AIPlan() {
         )}
       </div>
 
+      {/* Copy toast */}
+      {copyToast && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white text-sm px-4 py-2 rounded-lg shadow-lg animate-pulse">
+          ✅ 已复制到剪贴板
+        </div>
+      )}
+
       <div className="flex-1 flex overflow-hidden">
         {/* Chat area */}
         <div className="flex-1 flex flex-col">
@@ -471,25 +497,34 @@ export default function AIPlan() {
           <div className="px-4 py-3 border-b border-gray-200 bg-white flex items-center justify-between">
             <h2 className="font-semibold text-gray-900 text-sm">📄 方案预览</h2>
             {currentPlan && (
-              <button
-                onClick={() => {
-                  if (isEditingPlan) {
-                    // 保存编辑
-                    const textarea = document.getElementById('plan-editor') as HTMLTextAreaElement;
-                    if (textarea) {
-                      setEditedPlan(textarea.value);
+              <div className="flex gap-2">
+                <button
+                  onClick={handleCopyPlan}
+                  className="text-xs text-primary-600 hover:text-primary-800"
+                  aria-label="复制方案"
+                >
+                  📋 复制
+                </button>
+                <button
+                  onClick={() => {
+                    if (isEditingPlan) {
+                      // 保存编辑
+                      const textarea = document.getElementById('plan-editor') as HTMLTextAreaElement;
+                      if (textarea) {
+                        setEditedPlan(textarea.value);
+                      }
+                      setIsEditingPlan(false);
+                    } else {
+                      // 进入编辑模式
+                      setEditedPlan(currentPlan);
+                      setIsEditingPlan(true);
                     }
-                    setIsEditingPlan(false);
-                  } else {
-                    // 进入编辑模式
-                    setEditedPlan(currentPlan);
-                    setIsEditingPlan(true);
-                  }
-                }}
-                className="text-xs text-primary-600 hover:text-primary-800"
-              >
-                {isEditingPlan ? '💾 保存编辑' : '✏️ 编辑'}
-              </button>
+                  }}
+                  className="text-xs text-primary-600 hover:text-primary-800"
+                >
+                  {isEditingPlan ? '💾 保存编辑' : '✏️ 编辑'}
+                </button>
+              </div>
             )}
           </div>
           <div className="flex-1 overflow-y-auto p-4">

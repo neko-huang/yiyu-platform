@@ -90,7 +90,7 @@ async def check_and_unlock_achievements(
 
 async def _get_user_stats(db: AsyncSession, user_id: int) -> dict:
     """获取用户各项统计数据"""
-    from models import Event, Registration, AlbumPhoto, Review
+    from models import Event, Registration, AlbumPhoto, EventReview
 
     # 报名次数（已通过 + 已签到）
     reg_count = await db.scalar(
@@ -123,14 +123,14 @@ async def _get_user_stats(db: AsyncSession, user_id: int) -> dict:
     photo_count = await db.scalar(
         select(func.count())
         .select_from(AlbumPhoto)
-        .where(AlbumPhoto.uploaded_by == user_id)
+        .where(AlbumPhoto.user_id == user_id)
     )
 
     # 复盘数
     review_count = await db.scalar(
         select(func.count())
-        .select_from(Review)
-        .where(Review.organizer_id == user_id)
+        .select_from(EventReview)
+        .where(EventReview.user_id == user_id)
     )
 
     # 总积分

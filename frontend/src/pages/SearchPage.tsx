@@ -58,6 +58,15 @@ export default function SearchPage() {
 
   // 防抖
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 始终持有最新的 performSearch 引用，避免 handleFilterChange 中的闭包过期问题
+  const performSearchRef = useRef<() => void>(() => {});
+
+  // 组件卸载时清理防抖定时器
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
 
   const doSearch = useCallback(
     async (params: SearchParams, append = false) => {
@@ -127,6 +136,9 @@ export default function SearchPage() {
     doSearch(params, false);
   }, [query, category, city, startDate, endDate, sortBy, doSearch, setSearchParams]);
 
+  // 保持 ref 始终指向最新的 performSearch
+  performSearchRef.current = performSearch;
+
   // 首次加载
   useEffect(() => {
     performSearch();
@@ -143,8 +155,8 @@ export default function SearchPage() {
   };
 
   const handleFilterChange = () => {
-    // 筛选条件变化时立即搜索
-    setTimeout(() => performSearch(), 0);
+    // 筛选条件变化时立即搜索（通过 ref 调用，避免闭包捕获旧值）
+    setTimeout(() => performSearchRef.current(), 0);
   };
 
   const handleSubmit = (e: FormEvent) => {
@@ -206,7 +218,10 @@ export default function SearchPage() {
               type="button"
               onClick={() => {
                 setQuery('');
-                handleFilterChange();
+                // 使用 ref 调用最新 performSearch，避免闭包捕获旧 query
+                setTimeout(() => {
+                  performSearchRef.current();
+                }, 0);
               }}
               className="absolute right-16 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
               aria-label="清空搜索"
@@ -333,7 +348,7 @@ export default function SearchPage() {
               setStartDate('');
               setEndDate('');
               setSortBy('latest');
-              setTimeout(() => performSearch(), 0);
+              setTimeout(() => performSearchRef.current(), 0);
             }}
             className="ml-auto text-sm text-gray-400 hover:text-gray-600 transition-colors"
           >

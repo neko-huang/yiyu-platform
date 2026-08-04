@@ -10,7 +10,7 @@ from models import Discussion, User
 from routers.dependencies import check_organizer, get_current_user, get_event_or_404
 from schemas.discussion import DiscussionCreate, DiscussionListOut, DiscussionOut
 
-router = APIRouter(prefix="/discussions", tags=["讨论区"])
+router = APIRouter(tags=["讨论区"])
 
 
 @router.post(
@@ -27,12 +27,17 @@ async def create_discussion(
     """发帖（需登录）"""
     event = await get_event_or_404(event_id, db)
 
+    # 普通用户不允许设置公告标记，只有组织者才有权限
+    is_announcement = payload.is_announcement
+    if is_announcement:
+        check_organizer(event, current_user, "只有活动组织者可以发布公告")
+
     discussion = Discussion(
         event_id=event_id,
         user_id=current_user.id,
         content=payload.content,
         parent_id=payload.parent_id,
-        is_announcement=payload.is_announcement,
+        is_announcement=is_announcement,
     )
     db.add(discussion)
     await db.flush()
