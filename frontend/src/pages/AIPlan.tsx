@@ -130,38 +130,61 @@ export default function AIPlan() {
     setLoading(true);
     setErrorMsg('');
 
-    try {
-      // 传递 API Key、Base URL 和城市信息给后端
-      const payload: Record<string, string> = { prompt: userMessage };
-      if (apiKey) payload.api_key = apiKey;
-      if (baseUrl) payload.base_url = baseUrl;
-      if (city) payload.city = city;
+    const MAX_RETRIES = 2;
+    const RETRY_DELAY = 1500;
+    const payload: Record<string, string> = { prompt: userMessage };
+    if (apiKey) payload.api_key = apiKey;
+    if (baseUrl) payload.base_url = baseUrl;
+    if (city) payload.city = city;
 
-      const res = await client.post('/ai/plan/generate', payload);
-      const planContent = res.data.content || '抱歉，我暂时无法生成方案，请稍后重试。';
-      const newMessages = [...updatedMessages, { role: 'assistant' as const, content: planContent }];
-      setMessages(newMessages);
-      setCurrentPlan(planContent);
-    } catch (err) {
-      const isNetworkErr = err instanceof Error && !('response' in err && (err as { response?: unknown }).response);
-      const is404 = (err as { response?: { status: number } })?.response?.status === 404;
-      
-      if (isNetworkErr || is404) {
-        // 后端不可达或端点不存在 → 模拟
-        const mockPlan = generateMockPlan(userMessage);
-        timeoutRef.current = setTimeout(() => {
-          const newMessages = [...updatedMessages, { role: 'assistant' as const, content: mockPlan }];
-          setMessages(newMessages);
-          setCurrentPlan(mockPlan);
-          timeoutRef.current = null;
-        }, 1500);
-      } else {
-        const errMsg = getErrorMessage(err, 'AI 服务暂时不可用');
-        setErrorMsg(errMsg);
+    let lastError: unknown = null;
+
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        if (attempt > 0) {
+          setErrorMsg(`AI 服务暂时不可用，正在重试...（${attempt}/${MAX_RETRIES}）`);
+          await new Promise((r) => setTimeout(r, RETRY_DELAY));
+        }
+
+        const res = await client.post('/ai/plan/generate', payload);
+        const planContent = res.data.content || '抱歉，我暂时无法生成方案，请稍后重试。';
+        const newMessages = [...updatedMessages, { role: 'assistant' as const, content: planContent }];
+        setMessages(newMessages);
+        setCurrentPlan(planContent);
+        setErrorMsg('');
+        return; // 成功，退出
+      } catch (err) {
+        lastError = err;
+        const status = (err as { response?: { status: number } })?.response?.status;
+        const isNetworkErr = err instanceof Error && !('response' in err && (err as { response?: unknown }).response);
+
+        // 网络不通或 404 → 走模拟数据，不重试
+        if (isNetworkErr || status === 404) {
+          const mockPlan = generateMockPlan(userMessage);
+          timeoutRef.current = setTimeout(() => {
+            const newMessages = [...updatedMessages, { role: 'assistant' as const, content: mockPlan }];
+            setMessages(newMessages);
+            setCurrentPlan(mockPlan);
+            timeoutRef.current = null;
+          }, 1500);
+          return;
+        }
+
+        // Key 无效或余额不足 → 不重试，直接报错
+        if (status === 401 || status === 403) {
+          break;
+        }
+
+        // 5xx 或其他临时错误 → 重试（除非已达最大次数）
+        if (attempt < MAX_RETRIES) {
+          continue;
+        }
       }
-    } finally {
-      setLoading(false);
     }
+
+    // 所有重试都失败
+    const errMsg = getErrorMessage(lastError, 'AI 服务暂时不可用，请稍后重试');
+    setErrorMsg(errMsg);
   };
 
   const handleSavePlan = () => {
@@ -173,9 +196,58 @@ export default function AIPlan() {
     setTimeout(() => setErrorMsg(''), 3000);
   };
 
+  // 解析 AI 方案 markdown，提取结构化字段用于创建活动
+  const parseAIPlan = (markdown: string) => {
+    let title = '';
+    let category = '其他';
+    let tags = '';
+    let maxParticipants = 50;
+
+    // 从第一个 # 标题提取活动名称
+    const titleMatch = markdown.match(/^#\s+(.+)$/m);
+    if (titleMatch) title = titleMatch[1].trim();
+
+    // 提取 活动概述 章节
+    const overviewSection = markdown.match(/##\s*活动概述[\s\S]*?(?=##|$)/);
+    if (overviewSection) {
+      const overview = overviewSection[0];
+
+      // **活动名称** 优先覆盖标题
+      const nameMatch = overview.match(/\*\*活动名称\*\*\s*[：:]\s*(.+)/);
+      if (nameMatch) title = nameMatch[1].trim();
+
+      // 预期规模
+      const scaleMatch = overview.match(/\*\*预期规模\*\*\s*[：:]\s*(\d+)/);
+      if (scaleMatch) maxParticipants = parseInt(scaleMatch[1], 10);
+
+      // 从主题提取标签
+      const themeMatch = overview.match(/\*\*主题\*\*\s*[：:]\s*(.+)/);
+      if (themeMatch) {
+        const theme = themeMatch[1].trim();
+        const keywords = theme.split(/[，,、\s]+/).filter((k: string) => k.length > 1);
+        if (keywords.length > 0) tags = keywords.slice(0, 5).join('，');
+      }
+    }
+
+    // 从标题+主题推断分类
+    const combined = (title + ' ' + (markdown.match(/\*\*主题\*\*[：:]\s*(.+)/)?.[1] || '')).toLowerCase();
+    if (/猫|狗|宠物|动物|萌宠/.test(combined)) category = '宠物';
+    else if (/户外|徒步|登山|露营|爬山/.test(combined)) category = '户外';
+    else if (/音乐|演出|演唱会|乐队/.test(combined)) category = '音乐';
+    else if (/读书|阅读|分享会|书/.test(combined)) category = '文化';
+    else if (/运动|马拉松|跑步|健身|比赛/.test(combined)) category = '运动';
+    else if (/手工|DIY|手作|制作|陶艺/.test(combined)) category = '手工';
+    else if (/公益|志愿者|慈善|救助/.test(combined)) category = '公益';
+    else if (/亲子|家庭|儿童/.test(combined)) category = '亲子';
+    else if (/团建|公司|企业/.test(combined)) category = '团建';
+
+    return { title, description: markdown, tags, category, max_participants: maxParticipants };
+  };
+
   const handleConvertToEvent = () => {
     if (!currentPlan) return;
-    sessionStorage.setItem('aiPlanContent', currentPlan);
+    const parsed = parseAIPlan(currentPlan);
+    sessionStorage.setItem('aiPlanData', JSON.stringify(parsed));
     navigate('/events/create');
   };
 

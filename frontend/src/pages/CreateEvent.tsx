@@ -24,11 +24,35 @@ export default function CreateEvent() {
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState<FormData>(() => {
-    // 从 sessionStorage 读取 AI 策划内容预填描述
-    const aiPlan = sessionStorage.getItem('aiPlanContent');
-    if (aiPlan) {
-      sessionStorage.removeItem('aiPlanContent');
+    // 从 sessionStorage 读取 AI 策划结构化数据（优先于旧版纯文本）
+    let aiTitle = '';
+    let aiDescription = '';
+    let aiTags = '';
+    let aiCategory = '';
+    let aiMaxParticipants = 50;
+
+    const aiPlanData = sessionStorage.getItem('aiPlanData');
+    if (aiPlanData) {
+      try {
+        const parsed = JSON.parse(aiPlanData);
+        aiTitle = parsed.title || '';
+        aiDescription = parsed.description || '';
+        aiTags = parsed.tags || '';
+        aiCategory = parsed.category || '';
+        aiMaxParticipants = parsed.max_participants || 50;
+        sessionStorage.removeItem('aiPlanData');
+      } catch { /* ignore */ }
     }
+
+    // 旧版：从 sessionStorage 读取 AI 策划纯文本内容（降级）
+    if (!aiDescription) {
+      const aiPlan = sessionStorage.getItem('aiPlanContent');
+      if (aiPlan) {
+        aiDescription = aiPlan;
+        sessionStorage.removeItem('aiPlanContent');
+      }
+    }
+
     // 从 sessionStorage 读取 SOP 模板内容预填
     const sopRaw = sessionStorage.getItem('sopTemplateContent');
     let sopData: { title?: string; description?: string; tags?: string; category?: string } | null = null;
@@ -39,18 +63,18 @@ export default function CreateEvent() {
       } catch { /* ignore */ }
     }
     return {
-      title: sopData?.title || '',
-      description: sopData?.description || aiPlan || '',
+      title: sopData?.title || aiTitle,
+      description: sopData?.description || aiDescription,
       type: 'offline',
-      category: sopData?.category || '户外',
+      category: sopData?.category || aiCategory || '户外',
       start_time: '',
       end_time: '',
       location_name: '',
       latitude: 39.9042,
       longitude: 116.4074,
-      max_participants: 50,
+      max_participants: aiMaxParticipants,
       price: 0,
-      tags: sopData?.tags || '',
+      tags: sopData?.tags || aiTags,
     };
   });
 
