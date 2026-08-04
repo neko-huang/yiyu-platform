@@ -42,7 +42,7 @@ export default function MapView({
     AMapLoader.load({
       key: amapKey,
       version: '2.0',
-      plugins: ['AMap.Marker', 'AMap.InfoWindow', 'AMap.Geocoder'],
+      plugins: ['AMap.Marker', 'AMap.InfoWindow', 'AMap.Geocoder', 'AMap.AutoComplete', 'AMap.PlaceSearch'],
     }).then((AMap) => {
       if (disposed || !mapRef.current) return;
 

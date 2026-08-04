@@ -30,7 +30,17 @@ const mockPointsSummary: PointsSummary = {
   ],
 };
 
-const mockLeaderboard = [
+interface LeaderboardEntry {
+  user_id: number;
+  username: string;
+  display_name: string;
+  avatar_url?: string;
+  social_media: Record<string, string> | null;
+  total_points: number;
+  rank: number;
+}
+
+const mockLeaderboard: LeaderboardEntry[] = [
   { user_id: 3, username: 'climber', display_name: '攀岩达人', social_media: { xiaohongshu: '攀岩日记' }, total_points: 2450, rank: 1 },
   { user_id: 5, username: 'event_master', display_name: '活动达人', social_media: null, total_points: 2100, rank: 2 },
   { user_id: 1, username: 'hiker01', display_name: '山间行者', social_media: { weibo: '山间行者' }, total_points: 1280, rank: 3 },
@@ -41,7 +51,7 @@ const mockLeaderboard = [
 export default function AchievementPage() {
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [pointsSummary, setPointsSummary] = useState<PointsSummary | null>(null);
-  const [leaderboard, setLeaderboard] = useState<typeof mockLeaderboard>([]);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'achievements' | 'leaderboard'>('achievements');
 

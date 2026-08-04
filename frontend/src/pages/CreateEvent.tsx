@@ -1,4 +1,4 @@
-import { useState, FormEvent, useEffect, useCallback, useRef } from 'react';
+import { useState, FormEvent, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import MapView from '../components/MapView';
 import LocationSearch from '../components/LocationSearch';
@@ -6,7 +6,6 @@ import type { LocationResult } from '../components/LocationSearch';
 import client from '../api/client';
 import { createCategories, eventTypes } from '../utils/constants';
 import { getErrorMessage } from '../utils/errors';
-import AMapLoader from '@amap/amap-jsapi-loader';
 
 interface FormData {
   title: string;
@@ -25,7 +24,6 @@ interface FormData {
 
 export default function CreateEvent() {
   const navigate = useNavigate();
-  const geocoderReadyRef = useRef(false);
 
   // 读取存储的 AI 方案数据
   const readAIPlanData = () => {
@@ -95,19 +93,6 @@ export default function CreateEvent() {
   const [error, setError] = useState('');
   const [showAIModal, setShowAIModal] = useState(false);
 
-  // 预加载逆地理编码服务
-  useEffect(() => {
-    const amapKey = import.meta.env.VITE_AMAP_KEY || '';
-    if (!amapKey) return;
-    AMapLoader.load({
-      key: amapKey,
-      version: '2.0',
-      plugins: ['AMap.Geocoder'],
-    }).then(() => {
-      geocoderReadyRef.current = true;
-    }).catch(() => {});
-  }, []);
-
   const closeModal = useCallback(() => setShowAIModal(false), []);
   useEffect(() => {
     if (!showAIModal) return;
@@ -150,34 +135,24 @@ export default function CreateEvent() {
   const handleMapClick = (lat: number, lng: number) => {
     setFormData((prev) => ({ ...prev, latitude: lat, longitude: lng }));
 
-    if (!geocoderReadyRef.current) return;
+    const AMap = (window as any).AMap;
+    if (!AMap) return;
 
-    const amapKey = import.meta.env.VITE_AMAP_KEY || '';
-    AMapLoader.load({
-      key: amapKey,
-      version: '2.0',
-      plugins: ['AMap.Geocoder'],
-    }).then((AMap) => {
-      const geocoder = new AMap.Geocoder({ city: '北京', radius: 1000 });
-      geocoder.getAddress([lng, lat], (status: string, result: any) => {
-        if (status === 'complete' && result?.regeocode?.pois?.length) {
-          // 优先用最近的 POI 名称
-          const nearest = result.regeocode.pois[0];
-          setFormData((prev) => ({ ...prev, location_name: nearest.name }));
-        } else if (status === 'complete' && result?.regeocode?.addressComponent) {
-          const addr = result.regeocode.addressComponent;
-          const name = [
-            addr.district || '',
-            addr.street || '',
-            addr.streetNumber || '',
-          ].filter(Boolean).join('');
-          setFormData((prev) => ({
-            ...prev,
-            location_name: name || result.regeocode.formattedAddress || '已选地点',
-          }));
-        }
-      });
-    }).catch(() => {});
+    const geocoder = new AMap.Geocoder({ city: '北京', radius: 1000 });
+    geocoder.getAddress([lng, lat], (status: string, result: any) => {
+      if (status === 'complete' && result?.regeocode?.pois?.length) {
+        const nearest = result.regeocode.pois[0];
+        setFormData((prev) => ({ ...prev, location_name: nearest.name }));
+      } else if (status === 'complete' && result?.regeocode?.addressComponent) {
+        const addr = result.regeocode.addressComponent;
+        const name = [addr.district || '', addr.street || '', addr.streetNumber || '']
+          .filter(Boolean).join('');
+        setFormData((prev) => ({
+          ...prev,
+          location_name: name || result.regeocode.formattedAddress || '已选地点',
+        }));
+      }
+    });
   };
 
   const handleSubmit = async (e: FormEvent) => {

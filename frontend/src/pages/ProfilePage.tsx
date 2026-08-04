@@ -210,7 +210,7 @@ export default function ProfilePage() {
         if (val.trim()) cleaned[key] = val.trim();
       }
       const updatedUser = await updateUserInfo({
-        social_media: Object.keys(cleaned).length > 0 ? cleaned : null,
+        social_media: Object.keys(cleaned).length > 0 ? cleaned : undefined,
       });
       updateUser(updatedUser);
       setSocialMsg('✅ 社交账号保存成功');

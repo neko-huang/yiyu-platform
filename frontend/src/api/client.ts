@@ -69,6 +69,7 @@ import type {
   Profile,
   PublicProfile,
   UpdateProfileRequest,
+  User,
   Recommendation,
   SearchResult,
   SearchParams,
@@ -88,6 +89,7 @@ import type {
   UserAchievement,
   PointTransaction,
   PointsSummary,
+  MyRegistration,
 } from '../types';
 
 /** 将后端 UserProfileOut 响应转为前端 Profile 类型 */
@@ -316,7 +318,7 @@ export async function getAchievements(): Promise<Achievement[]> {
 }
 
 /** 获取积分排行榜 */
-export async function getLeaderboard(): Promise<Array<{ user_id: number; username: string; display_name: string; total_points: number; rank: number }>> {
+export async function getLeaderboard(): Promise<Array<{ user_id: number; username: string; display_name: string; avatar_url?: string; social_media: Record<string, string> | null; total_points: number; rank: number }>> {
   const res = await client.get('/leaderboard');
   return res.data;
 }
