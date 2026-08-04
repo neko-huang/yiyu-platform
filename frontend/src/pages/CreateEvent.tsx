@@ -1,9 +1,12 @@
-import { useState, FormEvent, useEffect, useCallback } from 'react';
+import { useState, FormEvent, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import MapView from '../components/MapView';
+import LocationSearch from '../components/LocationSearch';
+import type { LocationResult } from '../components/LocationSearch';
 import client from '../api/client';
 import { createCategories, eventTypes } from '../utils/constants';
 import { getErrorMessage } from '../utils/errors';
+import AMapLoader from '@amap/amap-jsapi-loader';
 
 interface FormData {
   title: string;
@@ -22,8 +25,9 @@ interface FormData {
 
 export default function CreateEvent() {
   const navigate = useNavigate();
+  const geocoderReadyRef = useRef(false);
 
-  // 读取存储的 AI 方案数据（sessionStorage 优先，localStorage 兜底）
+  // 读取存储的 AI 方案数据
   const readAIPlanData = () => {
     let data = sessionStorage.getItem('aiPlanData');
     if (!data) data = localStorage.getItem('aiPlanData');
@@ -54,7 +58,6 @@ export default function CreateEvent() {
       aiMaxParticipants = aiData.max_participants || 50;
     }
 
-    // 旧版：从 sessionStorage 读取 AI 策划纯文本内容（降级）
     if (!aiDescription) {
       const aiPlan = sessionStorage.getItem('aiPlanContent');
       if (aiPlan) {
@@ -63,7 +66,6 @@ export default function CreateEvent() {
       }
     }
 
-    // 从 sessionStorage 读取 SOP 模板内容预填
     const sopRaw = sessionStorage.getItem('sopTemplateContent');
     let sopData: { title?: string; description?: string; tags?: string; category?: string } | null = null;
     if (sopRaw) {
@@ -72,10 +74,11 @@ export default function CreateEvent() {
         sessionStorage.removeItem('sopTemplateContent');
       } catch { /* ignore */ }
     }
+
     return {
       title: sopData?.title || aiTitle,
       description: sopData?.description || aiDescription,
-      type: 'offline',
+      type: 'offline' as const,
       category: sopData?.category || aiCategory || '户外',
       start_time: '',
       end_time: '',
@@ -92,7 +95,19 @@ export default function CreateEvent() {
   const [error, setError] = useState('');
   const [showAIModal, setShowAIModal] = useState(false);
 
-  // AI 模态框：Escape 键关闭
+  // 预加载逆地理编码服务
+  useEffect(() => {
+    const amapKey = import.meta.env.VITE_AMAP_KEY || '';
+    if (!amapKey) return;
+    AMapLoader.load({
+      key: amapKey,
+      version: '2.0',
+      plugins: ['AMap.Geocoder'],
+    }).then(() => {
+      geocoderReadyRef.current = true;
+    }).catch(() => {});
+  }, []);
+
   const closeModal = useCallback(() => setShowAIModal(false), []);
   useEffect(() => {
     if (!showAIModal) return;
@@ -103,7 +118,6 @@ export default function CreateEvent() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [showAIModal, closeModal]);
 
-  // 兜底：每次组件挂载时检查 AI 方案数据（从 AIPlan 页面导航过来时触发）
   useEffect(() => {
     const aiData = readAIPlanData();
     if (aiData) {
@@ -122,15 +136,54 @@ export default function CreateEvent() {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
+  // ===== 地点搜索选中 → 更新地图 =====
+  const handleLocationSelect = (loc: LocationResult) => {
+    setFormData((prev) => ({
+      ...prev,
+      location_name: loc.name,
+      latitude: loc.lat,
+      longitude: loc.lng,
+    }));
+  };
+
+  // ===== 地图点击 → 逆地理编码回填地点名称 =====
   const handleMapClick = (lat: number, lng: number) => {
     setFormData((prev) => ({ ...prev, latitude: lat, longitude: lng }));
+
+    if (!geocoderReadyRef.current) return;
+
+    const amapKey = import.meta.env.VITE_AMAP_KEY || '';
+    AMapLoader.load({
+      key: amapKey,
+      version: '2.0',
+      plugins: ['AMap.Geocoder'],
+    }).then((AMap) => {
+      const geocoder = new AMap.Geocoder({ city: '北京', radius: 1000 });
+      geocoder.getAddress([lng, lat], (status: string, result: any) => {
+        if (status === 'complete' && result?.regeocode?.pois?.length) {
+          // 优先用最近的 POI 名称
+          const nearest = result.regeocode.pois[0];
+          setFormData((prev) => ({ ...prev, location_name: nearest.name }));
+        } else if (status === 'complete' && result?.regeocode?.addressComponent) {
+          const addr = result.regeocode.addressComponent;
+          const name = [
+            addr.district || '',
+            addr.street || '',
+            addr.streetNumber || '',
+          ].filter(Boolean).join('');
+          setFormData((prev) => ({
+            ...prev,
+            location_name: name || result.regeocode.formattedAddress || '已选地点',
+          }));
+        }
+      });
+    }).catch(() => {});
   };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
 
-    // 表单验证
     if (!formData.title.trim()) {
       setError('请输入活动标题');
       return;
@@ -139,17 +192,14 @@ export default function CreateEvent() {
       setError('请选择活动时间');
       return;
     }
-    // 验证结束时间晚于开始时间
     if (new Date(formData.end_time) <= new Date(formData.start_time)) {
       setError('结束时间必须晚于开始时间');
       return;
     }
-    // 验证人数上限
     if (formData.max_participants < 1) {
       setError('人数上限至少为1');
       return;
     }
-    // 验证价格不为负
     if (formData.price < 0) {
       setError('参与费用不能为负数');
       return;
@@ -224,9 +274,7 @@ export default function CreateEvent() {
                 aria-label="AI策划提示词"
               />
               <button
-                onClick={() => {
-                  navigate('/ai-plan');
-                }}
+                onClick={() => { navigate('/ai-plan'); }}
                 className="btn-primary w-full"
               >
                 前往 AI 策划页面 →
@@ -336,51 +384,33 @@ export default function CreateEvent() {
             </div>
           </div>
 
+          {/* 地点搜索（输入框+地图联动） */}
           <div>
-            <label htmlFor="event-location" className="block text-sm font-medium text-gray-700 mb-1.5">地点名称</label>
-            <input
-              id="event-location"
-              type="text"
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              活动地点 <span className="text-gray-400 font-normal">— 搜索地点或点击地图选点，双向联动</span>
+            </label>
+            <LocationSearch
               value={formData.location_name}
-              onChange={(e) => handleChange('location_name', e.target.value)}
-              className="input-field"
-              placeholder="如：北京香山公园"
+              onSelect={handleLocationSelect}
+              placeholder="搜索地点，如：温榆河公园、朝阳大悦城"
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="event-lat" className="block text-sm font-medium text-gray-700 mb-1.5">纬度</label>
-              <input
-                id="event-lat"
-                type="number"
-                step="any"
-                value={formData.latitude}
-                onChange={(e) => handleChange('latitude', parseFloat(e.target.value) || 0)}
-                className="input-field"
-              />
-            </div>
-            <div>
-              <label htmlFor="event-lng" className="block text-sm font-medium text-gray-700 mb-1.5">经度</label>
-              <input
-                id="event-lng"
-                type="number"
-                step="any"
-                value={formData.longitude}
-                onChange={(e) => handleChange('longitude', parseFloat(e.target.value) || 0)}
-                className="input-field"
-              />
-            </div>
+          {/* 显示当前选中坐标（只读） */}
+          <div className="flex gap-4 text-xs text-gray-500">
+            <span>纬度：{formData.latitude.toFixed(4)}</span>
+            <span>经度：{formData.longitude.toFixed(4)}</span>
           </div>
 
+          {/* 地图 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              📍 点击地图选取位置
+              📍 点击地图选取位置 <span className="text-gray-400 font-normal">— 点击后自动获取地点名称</span>
             </label>
             <MapView
               singleMarker={{ lat: formData.latitude, lng: formData.longitude, title: formData.location_name || '活动地点' }}
               center={[formData.latitude, formData.longitude]}
-              zoom={10}
+              zoom={14}
               height="300px"
               interactive
               onMapClick={handleMapClick}

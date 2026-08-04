@@ -24,8 +24,10 @@ export default function MapView({
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
+  const singleMarkerRef = useRef<any>(null);
   const [mapError, setMapError] = useState('');
 
+  // 初始化地图（只执行一次）
   useEffect(() => {
     if (!mapRef.current) return;
 
@@ -33,37 +35,34 @@ export default function MapView({
     const amapKey = import.meta.env.VITE_AMAP_KEY || '';
 
     if (!amapKey) {
-      setMapError('未配置高德地图 API Key，请在 frontend/.env 中设置 VITE_AMAP_KEY');
+      setMapError('未配置高德地图 API Key');
       return;
     }
 
     AMapLoader.load({
       key: amapKey,
       version: '2.0',
-      plugins: ['AMap.Marker', 'AMap.InfoWindow'],
+      plugins: ['AMap.Marker', 'AMap.InfoWindow', 'AMap.Geocoder'],
     }).then((AMap) => {
       if (disposed || !mapRef.current) return;
 
       const map = new AMap.Map(mapRef.current, {
         zoom,
-        center: [center[1], center[0]], // AMap uses [lng, lat]
+        center: [center[1], center[0]],
         viewMode: '2D',
         mapStyle: 'amap://styles/normal',
       });
-
       mapInstanceRef.current = map;
 
-      // Add markers for events (multi-marker mode)
+      // 事件多点标记
       if (events.length > 0) {
         const markers = events
           .filter((e) => e.latitude && e.longitude)
           .map((event) => {
             const marker = new AMap.Marker({
-              position: new AMap.LngLat(event.longitude, event.latitude),
+              position: [event.longitude, event.latitude],
               title: event.title,
-              extData: event,
             });
-
             const infoContent = `
               <div style="padding:4px 0;min-width:200px;font-family:system-ui,sans-serif;">
                 <h3 style="font-weight:600;font-size:14px;margin:0 0 4px;color:#111;">${event.title}</h3>
@@ -72,53 +71,42 @@ export default function MapView({
                 <a href="/events/${event.id}" style="font-size:12px;color:#2563eb;text-decoration:none;font-weight:500;">查看详情 →</a>
               </div>
             `;
-
             const infoWindow = new AMap.InfoWindow({
               content: infoContent,
               offset: new AMap.Pixel(0, -30),
               closeWhenClickMap: true,
             });
-
-            marker.on('click', () => {
-              infoWindow.open(map, marker.getPosition());
-            });
-
+            marker.on('click', () => infoWindow.open(map, marker.getPosition()));
             return marker;
           });
-
         map.add(markers);
         markersRef.current = markers;
-
-        // Auto-fit to show all markers
-        if (markers.length > 0) {
-          map.setFitView(markers, false, [60, 60, 60, 60]);
-        }
+        if (markers.length > 0) map.setFitView(markers, false, [60, 60, 60, 60]);
       }
 
-      // Single marker mode (event detail / create event)
+      // 初始单点标记
       if (singleMarker && singleMarker.lat && singleMarker.lng) {
         const marker = new AMap.Marker({
-          position: new AMap.LngLat(singleMarker.lng, singleMarker.lat),
+          position: [singleMarker.lng, singleMarker.lat],
           title: singleMarker.title,
         });
         map.add(marker);
-        markersRef.current = [marker];
+        singleMarkerRef.current = marker;
+        map.setCenter([singleMarker.lng, singleMarker.lat]);
+        if (zoom < 10) map.setZoom(14);
       }
 
-      // Map click handler (interactive mode for creating events)
+      // 点击事件
       if (onMapClick) {
         map.on('click', (e: any) => {
           onMapClick(e.lnglat.getLat(), e.lnglat.getLng());
         });
       }
 
-      // Enable scroll zoom in interactive mode
-      if (interactive) {
-        map.setStatus({ scrollWheel: true });
-      }
+      if (interactive) map.setStatus({ scrollWheel: true });
     }).catch((err: Error) => {
       console.error('Failed to load AMap:', err);
-      setMapError(`高德地图加载失败：${err.message || '请检查 API Key 是否正确，或该 Key 是否已添加当前域名到白名单'}`);
+      setMapError(`高德地图加载失败：${err.message || '请检查 API Key 是否正确'}`);
     });
 
     return () => {
@@ -128,8 +116,35 @@ export default function MapView({
         mapInstanceRef.current = null;
       }
       markersRef.current = [];
+      singleMarkerRef.current = null;
     };
-  }, [events, singleMarker, center, zoom, onMapClick, interactive]);
+    // 地图只初始化一次
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 单独更新单点标记位置（不重建地图）
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !singleMarker || !singleMarker.lat || !singleMarker.lng) return;
+
+    const AMap = (window as any).AMap;
+    const pos = [singleMarker.lng, singleMarker.lat];
+
+    if (singleMarkerRef.current) {
+      // 已有标记 → 移动位置
+      singleMarkerRef.current.setPosition(pos);
+      singleMarkerRef.current.setTitle(singleMarker.title);
+    } else {
+      // 新建标记
+      const marker = new (AMap as any).Marker({ position: pos, title: singleMarker.title });
+      map.add(marker);
+      singleMarkerRef.current = marker;
+    }
+
+    // 平滑移动地图中心到标记位置
+    map.setCenter(pos, true);
+    if (map.getZoom() < 10) map.setZoom(14);
+  }, [singleMarker]);
 
   return (
     <>
