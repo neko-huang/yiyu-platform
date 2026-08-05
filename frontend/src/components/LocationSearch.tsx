@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import client from '../api/client';
 
 export interface LocationResult {
   name: string;
@@ -33,11 +34,9 @@ export default function LocationSearch({ value, onSelect, placeholder }: Locatio
   const wrapperRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  const amapKey = import.meta.env.VITE_AMAP_KEY || '';
-
-  // 使用高德地图 REST API 做搜索联想（不依赖 JS SDK 加载，稳定可靠）
+  // 使用后端代理接口做搜索联想（解决浏览器 CORS 限制）
   const doSearch = useCallback(async (keyword: string) => {
-    if (!keyword.trim() || !amapKey) {
+    if (!keyword.trim()) {
       setSuggestions([]);
       setShowDropdown(false);
       return;
@@ -54,30 +53,16 @@ export default function LocationSearch({ value, onSelect, placeholder }: Locatio
     setErrorMsg('');
 
     try {
-      // 高德地图 Web 服务 API：输入提示（搜索联想）
-      const url = `https://restapi.amap.com/v3/assistant/inputtips`
-        + `?key=${encodeURIComponent(amapKey)}`
-        + `&keywords=${encodeURIComponent(keyword)}`
-        + `&citylimit=false`
-        + `&datatype=poi`
-        + `&offset=10`;
-
-      const resp = await fetch(url, {
+      // 调用后端代理接口，由后端转发到高德 REST API
+      const resp = await client.get('/search/suggestions', {
+        params: { keywords: keyword, city: '' },
         signal: controller.signal,
-        headers: { 'Accept': 'application/json' },
       });
 
-      if (!resp.ok) {
-        throw new Error(`搜索服务返回 ${resp.status}`);
-      }
+      const data = resp.data;
 
-      const data = await resp.json();
-
-      if (data.status === '1' && data.tips?.length) {
-        // 过滤掉没有 location 坐标的 tips（无法定位）
-        const validTips = data.tips.filter((t: any) => t.location);
-        setSuggestions(validTips.slice(0, 10));
-        // 始终打开下拉，这样当 validTips 为空时也能展示"未找到"提示
+      if (data.tips?.length) {
+        setSuggestions(data.tips.slice(0, 10));
         setShowDropdown(true);
       } else {
         setSuggestions([]);
@@ -86,18 +71,18 @@ export default function LocationSearch({ value, onSelect, placeholder }: Locatio
       }
     } catch (err: any) {
       if (err.name === 'AbortError') return; // 被取消，忽略
+      if (err.code === 'ERR_CANCELED') return; // axios 取消，忽略
       setErrorMsg('搜索服务异常，请稍后重试');
       setSuggestions([]);
       setShowDropdown(false);
     } finally {
       setSearching(false);
     }
-  }, [amapKey]);
+  }, []);
 
-  // 用 REST API 获取 POI 详情坐标
-  const fetchPoiDetail = useCallback(async (tip: SuggestionTip): Promise<LocationResult | null> => {
-    // 如果 location 已存在，直接解析
-    if (tip.location) {
+  // 从搜索结果中的 tip 直接解析坐标（tip 的 location 字段格式为 "lng,lat"）
+  const parseTipLocation = (tip: SuggestionTip): LocationResult | null => {
+    if (tip.location && tip.location !== '') {
       const parts = tip.location.split(',');
       if (parts.length === 2) {
         const lng = parseFloat(parts[0]);
@@ -112,44 +97,44 @@ export default function LocationSearch({ value, onSelect, placeholder }: Locatio
         }
       }
     }
+    return null;
+  };
 
-    // 通过 id 获取详情（高德 POI 详情 API）
+  // 通过后端代理获取 POI 详情坐标
+  const fetchPoiDetail = useCallback(async (tip: SuggestionTip): Promise<LocationResult | null> => {
+    // 优先从 tip.location 直接解析
+    const directResult = parseTipLocation(tip);
+    if (directResult) return directResult;
+
+    // 通过 id 调用后端代理获取详情
     if (tip.id) {
       try {
-        const url = `https://restapi.amap.com/v3/place/detail`
-          + `?key=${encodeURIComponent(amapKey)}`
-          + `&id=${encodeURIComponent(tip.id)}`;
-
-        const resp = await fetch(url);
-        if (resp.ok) {
-          const data = await resp.json();
-          if (data.status === '1' && data.pois?.length) {
-            const poi = data.pois[0];
-            const loc = poi.location;
-            if (loc) {
-              const parts = loc.split(',');
-              if (parts.length === 2) {
-                const lng = parseFloat(parts[0]);
-                const lat = parseFloat(parts[1]);
-                if (!isNaN(lat) && !isNaN(lng)) {
-                  return {
-                    name: poi.name || tip.name,
-                    lat,
-                    lng,
-                    address: (poi.pname || '') + (poi.cityname || '') + (poi.adname || '') + (poi.address || ''),
-                  };
-                }
-              }
+        const resp = await client.get('/search/poi-detail', {
+          params: { id: tip.id },
+        });
+        const poi = resp.data.poi;
+        if (poi && poi.location) {
+          const parts = poi.location.split(',');
+          if (parts.length === 2) {
+            const lng = parseFloat(parts[0]);
+            const lat = parseFloat(parts[1]);
+            if (!isNaN(lat) && !isNaN(lng)) {
+              return {
+                name: poi.name || tip.name,
+                lat,
+                lng,
+                address: (poi.pname || '') + (poi.cityname || '') + (poi.adname || '') + (poi.address || ''),
+              };
             }
           }
         }
       } catch {
-        // 静默失败，返回 basic 信息
+        // 静默失败
       }
     }
 
     return null;
-  }, [amapKey]);
+  }, []);
 
   // 输入变化 → 防抖触发搜索
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -173,8 +158,6 @@ export default function LocationSearch({ value, onSelect, placeholder }: Locatio
     if (result) {
       onSelect(result);
     } else {
-      // fetchPoiDetail 内部已尝试解析 tip.location 和通过 id 获取详情
-      // 均失败则直接提示用户，无需再重复解析 tip.location
       setErrorMsg('无法获取该地点的精确坐标，请尝试其他关键词或在地图上选点');
     }
   };
@@ -245,10 +228,6 @@ export default function LocationSearch({ value, onSelect, placeholder }: Locatio
 
       {errorMsg && (
         <p className="text-xs text-red-500 mt-1">{errorMsg}</p>
-      )}
-
-      {!amapKey && (
-        <p className="text-xs text-red-500 mt-1">未配置高德地图 API Key</p>
       )}
 
       {showDropdown && suggestions.length > 0 && (

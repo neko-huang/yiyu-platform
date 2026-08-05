@@ -122,12 +122,17 @@ export default function MapView({
           geocoder.getAddress([lng, lat], (status: string, result: any) => {
             let address: string | undefined;
             if (status === 'complete' && result?.regeocode) {
-              if (result.regeocode.pois?.length) {
-                address = result.regeocode.pois[0].name;
-              } else if (result.regeocode.addressComponent) {
-                const addr = result.regeocode.addressComponent;
+              const rg = result.regeocode;
+              // 优先使用 POI 名称（如"北京通州站"），最简洁
+              if (rg.pois?.length) {
+                address = rg.pois[0].name;
+              } else if (rg.formattedAddress) {
+                // 其次使用格式化地址（如"北京市通州区新华街道..."），完整可读
+                address = rg.formattedAddress;
+              } else if (rg.addressComponent) {
+                const addr = rg.addressComponent;
                 address = [addr.district || '', addr.street || '', addr.streetNumber || '']
-                  .filter(Boolean).join('') || result.regeocode.formattedAddress;
+                  .filter(Boolean).join('');
               }
             }
             onMapClick(lat, lng, address);
