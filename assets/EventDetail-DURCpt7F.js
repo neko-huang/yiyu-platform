@@ -1,4 +1,4 @@
-import{d as ee,a as se,u as te,r as a,c as h,j as e,L as N,e as ae}from"./index-DcO0O1wg.js";import{M as re}from"./MapView-DWdtvBd7.js";import{g as ie,s as b}from"./constants-yAD4NwD5.js";function q(n){try{const m=`mockEvent_${n.id}`;localStorage.setItem(m,JSON.stringify(n))}catch{}}function ne(n){try{const m=`mockEvent_${n}`,i=localStorage.getItem(m);if(i)return JSON.parse(i)}catch{}return null}const le={1:{id:1,title:"周末香山徒步登山活动",description:`金秋时节，香山红叶正盛。我们组织一次轻松的徒步登山活动，适合各年龄段参与。
+import{d as ee,a as se,u as te,r as a,c as h,j as e,L as N,e as ae}from"./index-EiCDiotV.js";import{M as re}from"./MapView-CtlY3-sP.js";import{g as ie,s as b}from"./constants-yAD4NwD5.js";function q(n){try{const m=`mockEvent_${n.id}`;localStorage.setItem(m,JSON.stringify(n))}catch{}}function ne(n){try{const m=`mockEvent_${n}`,i=localStorage.getItem(m);if(i)return JSON.parse(i)}catch{}return null}const le={1:{id:1,title:"周末香山徒步登山活动",description:`金秋时节，香山红叶正盛。我们组织一次轻松的徒步登山活动，适合各年龄段参与。
 
 **活动亮点：**
 - 专业领队带队，全程安全保障
