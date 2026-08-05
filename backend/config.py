@@ -20,7 +20,14 @@ DATA_DIR.mkdir(exist_ok=True)
 # ---------------------------------------------------------------------------
 # 数据库
 # ---------------------------------------------------------------------------
-DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite+aiosqlite:///{DATA_DIR / 'yiyu.db'}")
+_DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite+aiosqlite:///{DATA_DIR / 'yiyu.db'}")
+# 自动转换 PostgreSQL URL 格式（如 Railway 提供的 postgresql:// → postgresql+asyncpg://）
+if _DATABASE_URL.startswith("postgresql://") and "+asyncpg" not in _DATABASE_URL:
+    DATABASE_URL = _DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
+elif _DATABASE_URL.startswith("postgres://") and "+asyncpg" not in _DATABASE_URL:
+    DATABASE_URL = _DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
+else:
+    DATABASE_URL = _DATABASE_URL
 
 # ---------------------------------------------------------------------------
 # JWT — 生产环境必须通过环境变量设置 SECRET_KEY
