@@ -1,0 +1,82 @@
+[
+  {
+    "file_name": "project/yiyu_platform_mvp.md",
+    "category": "project",
+    "summary": "益屿活动管理平台MVP项目全量交付详情，包含前后端功能清单、安全审计结果、模拟账号、部署方式",
+    "tags": ["益屿", "活动管理平台", "FastAPI", "React", "MVP项目"],
+    "importance": 4,
+    "created_at": "2026-08-03T08:00:00Z",
+    "updated_at": "2026-08-03T08:00:00Z",
+    "expires_at": null
+  },
+  {
+    "file_name": "project/yiyu_platform_phase1_implementation_20260804.md",
+    "category": "project",
+    "summary": "益屿活动管理平台本地版Phase 1后端从零实现交付，14项全量测试通过，包含用户画像、上传、搜索、推荐四大模块",
+    "tags": ["益屿", "活动管理平台", "Phase1", "FastAPI", "全量测试", "后端开发"],
+    "importance": 4,
+    "created_at": "2026-08-04T00:00:00Z",
+    "updated_at": "2026-08-04T00:00:00Z",
+    "expires_at": null
+  },
+  {
+    "file_name": "project/yiyu_frontend_code_review_202608.md",
+    "category": "project",
+    "summary": "益屿活动管理平台前端全量代码审查优化，修复7大类32项问题，构建100%通过，产出完整审查报告",
+    "tags": ["益屿", "活动管理平台", "前端审查", "React+TypeScript", "代码优化", "Vite构建"],
+    "importance": 4,
+    "created_at": "2026-08-04T04:27:54Z",
+    "updated_at": "2026-08-04T04:27:54Z",
+    "expires_at": "2026-11-04T04:27:54Z"
+  },
+  {
+    "file_name": "project/yiyu_platform_frontend_full_create_20260803.md",
+    "category": "project",
+    "summary": "益屿活动管理平台前端项目从零全量创建完成，包含所有配置、组件、10个业务页面，构建验证通过",
+    "tags": ["益屿", "活动管理平台", "前端全量创建", "React+TypeScript", "Leaflet地图", "Vite构建"],
+    "importance": 4,
+    "created_at": "2026-08-03T03:56:38Z",
+    "updated_at": "2026-08-03T03:56:38Z",
+    "expires_at": "2026-11-03T03:56:38Z"
+  },
+  {
+    "file_name": "project/yiyu_backend_full_complete_20260803.md",
+    "category": "project",
+    "summary": "益屿活动管理平台2026-08-03全量基础后端从零实现交付，包含活动、报名、财务、DeepSeek AI生成全模块，11项API测试全通过",
+    "tags": ["益屿", "活动管理平台", "FastAPI", "SQLAlchemy Async", "DeepSeek AI", "后端全量开发"],
+    "importance": 4,
+    "created_at": "2026-08-03T03:56:38Z",
+    "updated_at": "2026-08-03T03:56:38Z",
+    "expires_at": null
+  },
+  {
+    "file_name": "project/yiyu_platform_phase1_frontend_20260804.md",
+    "category": "project",
+    "summary": "益屿活动管理平台Phase1前端全量功能交付，含用户画像、搜索增强、推荐展示、导航增强，TS和生产构建双验证通过",
+    "tags": ["益屿", "活动管理平台", "Phase1", "前端开发", "React+TypeScript"],
+    "importance": 4,
+    "created_at": "2026-08-04T00:00:00Z",
+    "updated_at": "2026-08-04T00:00:00Z",
+    "expires_at": "2026-11-04T00:00:00Z"
+  },
+  {
+    "file_name": "project/yiyu_backend_security_audit_20260803.md",
+    "category": "project",
+    "summary": "益屿活动管理平台后端全量安全审查与优化，22项问题全部修复，25项自动化测试全部通过，完成安全加固",
+    "tags": ["益屿", "活动管理平台", "后端安全审查", "FastAPI", "代码优化", "安全加固"],
+    "importance": 4,
+    "created_at": "2026-08-04T04:27:54Z",
+    "updated_at": "2026-08-04T04:27:54Z",
+    "expires_at": null
+  },
+  {
+    "file_name": "project/yiyu_platform_backend_missing_modules_20260805.md",
+    "category": "project",
+    "summary": "益屿活动管理平台后端四大缺失模块（AI多平台文案、活动相册、讨论区、成就积分）全量实现交付，12个文件全部语法校验通过",
+    "tags": ["益屿", "活动管理平台", "后端缺失模块", "FastAPI", "成就积分", "活动相册", "讨论区"],
+    "importance": 4,
+    "created_at": "2026-08-05T00:00:00Z",
+    "updated_at": "2026-08-05T00:00:00Z",
+    "expires_at": null
+  }
+]
