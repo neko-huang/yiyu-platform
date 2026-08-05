@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import AMapLoader from '@amap/amap-jsapi-loader';
+import axios from 'axios';
 import type { Event } from '../types';
 
 interface MapViewProps {
@@ -12,6 +13,8 @@ interface MapViewProps {
   interactive?: boolean;
   focusedEventId?: number | null;
 }
+
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
 
 /** Escape special characters to prevent XSS in HTML strings */
 function escapeHtml(str: string): string {
@@ -60,7 +63,7 @@ export default function MapView({
     AMapLoader.load({
       key: amapKey,
       version: '2.0',
-      plugins: ['AMap.Marker', 'AMap.InfoWindow', 'AMap.Geocoder', 'AMap.AutoComplete', 'AMap.PlaceSearch'],
+      plugins: ['AMap.Marker', 'AMap.InfoWindow'],
     }).then((AMap: any) => {
       if (disposed || !mapRef.current) return;
 
@@ -118,44 +121,24 @@ export default function MapView({
         if (map.getZoom() < 10) map.setZoom(14);
       }
 
-      // 点击事件 — 逆地理编码获取地点名称
-      // 在闭包内捕获 AMap 引用，确保插件可用
+      // 点击事件 — 通过后端 REST API 做逆地理编码
       if (onMapClickRef.current) {
-        map.on('click', (e: any) => {
+        map.on('click', async (e: any) => {
           const lat = e.lnglat.getLat();
           const lng = e.lnglat.getLng();
 
-          // 使用闭包中的 AMap 创建 Geocoder，确保插件可用
           try {
-            const geocoder = new AMap.Geocoder({ city: '' });
-            geocoder.getAddress([lng, lat], (status: string, result: any) => {
-              let address: string | undefined;
-              if (status === 'complete' && result && result.regeocode) {
-                const rg = result.regeocode;
-                // 优先使用附近 POI 名称
-                if (rg.pois && rg.pois.length > 0) {
-                  address = rg.pois[0].name;
-                }
-                // 其次使用格式化地址
-                if (!address && rg.formattedAddress) {
-                  address = rg.formattedAddress;
-                }
-                // 最后拼接地址组件
-                if (!address && rg.addressComponent) {
-                  const ac = rg.addressComponent;
-                  address = [ac.province || '', ac.city || '', ac.district || '', ac.street || '', ac.streetNumber || '']
-                    .filter(Boolean).join('');
-                }
-              }
-              // 如果逆地理编码完全失败，用坐标作为兜底
-              if (!address) {
-                address = `${lat.toFixed(4)}, ${lng.toFixed(4)} 附近`;
-              }
-              onMapClickRef.current?.(lat, lng, address);
+            const resp = await axios.get(`${BASE_URL}/search/reverse-geocode`, {
+              params: { location: `${lng},${lat}` },
+              headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` },
+              timeout: 5000,
             });
-          } catch (err) {
-            console.error('逆地理编码失败:', err);
-            // 兜底：至少传坐标信息
+            const { name, address } = resp.data;
+            // 优先使用 POI 名称（如"天安门"），其次完整地址
+            const displayName = name || address || undefined;
+            onMapClickRef.current?.(lat, lng, displayName);
+          } catch {
+            // 后端不可用时的兜底
             onMapClickRef.current?.(lat, lng, `${lat.toFixed(4)}, ${lng.toFixed(4)} 附近`);
           }
         });
