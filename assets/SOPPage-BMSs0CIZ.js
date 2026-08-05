@@ -1,4 +1,4 @@
-import{a as D,r,v as W,j as e,w as E,x as F,y as I}from"./index-7U08bBCJ.js";import{a as L}from"./constants-yAD4NwD5.js";const v=[{id:1,user_id:1,name:"户外徒步活动 SOP",category:"户外",description:"适用于 20-50 人的户外徒步活动标准流程模板",content:`# 户外徒步活动 SOP
+import{a as D,r,v as W,j as e,w as E,x as F,y as I}from"./index-DcO0O1wg.js";import{a as L}from"./constants-yAD4NwD5.js";const v=[{id:1,user_id:1,name:"户外徒步活动 SOP",category:"户外",description:"适用于 20-50 人的户外徒步活动标准流程模板",content:`# 户外徒步活动 SOP
 
 ## 活动概述
 - 适用场景：周末短途徒步、城市周边登山
