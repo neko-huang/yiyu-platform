@@ -139,7 +139,7 @@ export default function CreateEvent() {
       ...prev,
       latitude: lat,
       longitude: lng,
-      location_name: address || prev.location_name || '已选地点',
+      location_name: address || prev.location_name || `${lat.toFixed(4)}, ${lng.toFixed(4)} 附近`,
     }));
   };
 

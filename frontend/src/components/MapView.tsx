@@ -37,8 +37,13 @@ export default function MapView({
   const mapInstanceRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
   const singleMarkerRef = useRef<any>(null);
-  const geocoderRef = useRef<any>(null);
+  const onMapClickRef = useRef(onMapClick);
   const [mapError, setMapError] = useState('');
+
+  // 保持 onMapClick 引用最新
+  useEffect(() => {
+    onMapClickRef.current = onMapClick;
+  }, [onMapClick]);
 
   // 初始化地图（只执行一次）
   useEffect(() => {
@@ -66,9 +71,6 @@ export default function MapView({
         mapStyle: 'amap://styles/normal',
       });
       mapInstanceRef.current = map;
-
-      // 缓存 Geocoder 实例，供 click 回调复用
-      geocoderRef.current = new AMap.Geocoder({ city: '', radius: 1000 });
 
       // 事件多点标记
       if (events.length > 0) {
@@ -112,36 +114,50 @@ export default function MapView({
         });
         map.add(marker);
         singleMarkerRef.current = marker;
-        map.setCenter([singleMarker.lng, singleMarker.lat], true);
+        map.setCenter([singleMarker.lng, singleMarker.lat]);
         if (map.getZoom() < 10) map.setZoom(14);
       }
 
       // 点击事件 — 逆地理编码获取地点名称
-      if (onMapClick) {
+      // 在闭包内捕获 AMap 引用，确保插件可用
+      if (onMapClickRef.current) {
         map.on('click', (e: any) => {
           const lat = e.lnglat.getLat();
           const lng = e.lnglat.getLng();
-          const gc = geocoderRef.current;
-          if (!gc) {
-            onMapClick(lat, lng);
-            return;
-          }
-          gc.getAddress([lng, lat], (status: string, result: any) => {
-            let address: string | undefined;
-            if (status === 'complete' && result?.regeocode) {
-              const rg = result.regeocode;
-              if (rg.pois?.length) {
-                address = rg.pois[0].name;
-              } else if (rg.formattedAddress) {
-                address = rg.formattedAddress;
-              } else if (rg.addressComponent) {
-                const addr = rg.addressComponent;
-                address = [addr.district || '', addr.street || '', addr.streetNumber || '']
-                  .filter(Boolean).join('');
+
+          // 使用闭包中的 AMap 创建 Geocoder，确保插件可用
+          try {
+            const geocoder = new AMap.Geocoder({ city: '' });
+            geocoder.getAddress([lng, lat], (status: string, result: any) => {
+              let address: string | undefined;
+              if (status === 'complete' && result && result.regeocode) {
+                const rg = result.regeocode;
+                // 优先使用附近 POI 名称
+                if (rg.pois && rg.pois.length > 0) {
+                  address = rg.pois[0].name;
+                }
+                // 其次使用格式化地址
+                if (!address && rg.formattedAddress) {
+                  address = rg.formattedAddress;
+                }
+                // 最后拼接地址组件
+                if (!address && rg.addressComponent) {
+                  const ac = rg.addressComponent;
+                  address = [ac.province || '', ac.city || '', ac.district || '', ac.street || '', ac.streetNumber || '']
+                    .filter(Boolean).join('');
+                }
               }
-            }
-            onMapClick(lat, lng, address);
-          });
+              // 如果逆地理编码完全失败，用坐标作为兜底
+              if (!address) {
+                address = `${lat.toFixed(4)}, ${lng.toFixed(4)} 附近`;
+              }
+              onMapClickRef.current?.(lat, lng, address);
+            });
+          } catch (err) {
+            console.error('逆地理编码失败:', err);
+            // 兜底：至少传坐标信息
+            onMapClickRef.current?.(lat, lng, `${lat.toFixed(4)}, ${lng.toFixed(4)} 附近`);
+          }
         });
       }
 
@@ -159,9 +175,8 @@ export default function MapView({
       }
       markersRef.current = [];
       singleMarkerRef.current = null;
-      geocoderRef.current = null;
     };
-    // 地图只初始化一次，不依赖 singleMarker
+    // 地图只初始化一次
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -177,11 +192,9 @@ export default function MapView({
     const pos: [number, number] = [singleMarker.lng, singleMarker.lat];
 
     if (singleMarkerRef.current) {
-      // 已有标记 → 移动位置 + 更新标题
       singleMarkerRef.current.setPosition(pos);
       singleMarkerRef.current.setTitle(singleMarker.title);
     } else {
-      // 新建标记
       const marker = new AMap.Marker({
         position: pos,
         title: singleMarker.title,
@@ -190,7 +203,6 @@ export default function MapView({
       singleMarkerRef.current = marker;
     }
 
-    // 平滑移动地图中心到标记位置
     map.setCenter(pos, true);
     if (map.getZoom() < 10) map.setZoom(14);
   }, [singleMarker]);
