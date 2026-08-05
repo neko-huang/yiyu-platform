@@ -16,11 +16,11 @@ interface MapViewProps {
 /** Escape special characters to prevent XSS in HTML strings */
 function escapeHtml(str: string): string {
   return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+    .replace(/\&/g, '\&amp;')
+    .replace(/\</g, '\&lt;')
+    .replace(/\>/g, '\&gt;')
+    .replace(/"/g, '\&quot;')
+    .replace(/'/g, '\&#39;');
 }
 
 export default function MapView({
@@ -37,6 +37,7 @@ export default function MapView({
   const mapInstanceRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
   const singleMarkerRef = useRef<any>(null);
+  const geocoderRef = useRef<any>(null);
   const [mapError, setMapError] = useState('');
 
   // 初始化地图（只执行一次）
@@ -55,7 +56,7 @@ export default function MapView({
       key: amapKey,
       version: '2.0',
       plugins: ['AMap.Marker', 'AMap.InfoWindow', 'AMap.Geocoder', 'AMap.AutoComplete', 'AMap.PlaceSearch'],
-    }).then((AMap) => {
+    }).then((AMap: any) => {
       if (disposed || !mapRef.current) return;
 
       const map = new AMap.Map(mapRef.current, {
@@ -65,6 +66,9 @@ export default function MapView({
         mapStyle: 'amap://styles/normal',
       });
       mapInstanceRef.current = map;
+
+      // 缓存 Geocoder 实例，供 click 回调复用
+      geocoderRef.current = new AMap.Geocoder({ city: '', radius: 1000 });
 
       // 事件多点标记
       if (events.length > 0) {
@@ -108,26 +112,27 @@ export default function MapView({
         });
         map.add(marker);
         singleMarkerRef.current = marker;
-        map.setCenter([singleMarker.lng, singleMarker.lat]);
-        if (zoom < 10) map.setZoom(14);
+        map.setCenter([singleMarker.lng, singleMarker.lat], true);
+        if (map.getZoom() < 10) map.setZoom(14);
       }
 
       // 点击事件 — 逆地理编码获取地点名称
       if (onMapClick) {
-        const geocoder = new AMap.Geocoder({ city: '', radius: 1000 });
         map.on('click', (e: any) => {
           const lat = e.lnglat.getLat();
           const lng = e.lnglat.getLng();
-          // 尝试逆地理编码获取地址名称
-          geocoder.getAddress([lng, lat], (status: string, result: any) => {
+          const gc = geocoderRef.current;
+          if (!gc) {
+            onMapClick(lat, lng);
+            return;
+          }
+          gc.getAddress([lng, lat], (status: string, result: any) => {
             let address: string | undefined;
             if (status === 'complete' && result?.regeocode) {
               const rg = result.regeocode;
-              // 优先使用 POI 名称（如"北京通州站"），最简洁
               if (rg.pois?.length) {
                 address = rg.pois[0].name;
               } else if (rg.formattedAddress) {
-                // 其次使用格式化地址（如"北京市通州区新华街道..."），完整可读
                 address = rg.formattedAddress;
               } else if (rg.addressComponent) {
                 const addr = rg.addressComponent;
@@ -154,26 +159,33 @@ export default function MapView({
       }
       markersRef.current = [];
       singleMarkerRef.current = null;
+      geocoderRef.current = null;
     };
-    // 地图只初始化一次
+    // 地图只初始化一次，不依赖 singleMarker
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 单独更新单点标记位置（不重建地图）
   useEffect(() => {
     const map = mapInstanceRef.current;
-    if (!map || !singleMarker || !singleMarker.lat || !singleMarker.lng) return;
+    if (!map) return;
+    if (!singleMarker || !singleMarker.lat || !singleMarker.lng) return;
 
     const AMap = (window as any).AMap;
-    const pos = [singleMarker.lng, singleMarker.lat];
+    if (!AMap) return;
+
+    const pos: [number, number] = [singleMarker.lng, singleMarker.lat];
 
     if (singleMarkerRef.current) {
-      // 已有标记 → 移动位置
+      // 已有标记 → 移动位置 + 更新标题
       singleMarkerRef.current.setPosition(pos);
       singleMarkerRef.current.setTitle(singleMarker.title);
     } else {
       // 新建标记
-      const marker = new (AMap as any).Marker({ position: pos, title: singleMarker.title });
+      const marker = new AMap.Marker({
+        position: pos,
+        title: singleMarker.title,
+      });
       map.add(marker);
       singleMarkerRef.current = marker;
     }
@@ -195,11 +207,11 @@ export default function MapView({
     const pos = marker.getPosition();
     map.setCenter(pos, true);
     if (map.getZoom() < 13) map.setZoom(13);
-    // 关闭其他信息窗，打开当前
     infoWindow.open(map, pos);
   }, [focusedEventId]);
 
-  return (<>
+  return (
+    <>
       {mapError && (
         <div className="flex items-center justify-center bg-red-50 border border-red-200 rounded-xl p-6 text-center" style={{ height }}>
           <div>
